@@ -1,0 +1,20 @@
+{
+  "name": "tppf-clinic-management-system",
+  "version": "0.1.0",
+  "description": "TPPF Clinic Management System — Access to PostgreSQL rebuild",
+  "private": true,
+  "scripts": {
+    "migrate:up": "node db/migrate.js up",
+    "migrate:down": "node db/migrate.js down",
+    "migrate:status": "node db/migrate.js status",
+    "seed": "node db/seed.js",
+    "dev": "node server/src/server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.12.0"
+  }
+}
