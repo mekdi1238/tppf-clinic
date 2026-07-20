@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Patients · TPPF Clinic</title>
+<link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" id="page-content">
+
+        <div class="page-toolbar">
+          <div class="toolbar-filters">
+            <div class="search-box">
+              <span id="search-icon-slot"></span>
+              <input type="text" id="search-input" placeholder="Search by name, code, or phone…" />
+            </div>
+            <select class="select-filter" id="status-filter">
+              <option value="all">All statuses</option>
+              <option value="active">Active only</option>
+              <option value="inactive">Inactive only</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="new-patient-btn">
+            <span id="plus-icon-slot"></span> New Patient
+          </button>
+        </div>
+
+        <div id="patients-table-region"></div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Add / Edit Patient Modal -->
+  <div class="modal-backdrop" id="patient-modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2 id="patient-modal-title">New Patient</h2>
+          <p id="patient-modal-sub">Add a walk-in patient to the clinic register.</p>
+        </div>
+        <button class="icon-btn" id="patient-modal-close"></button>
+      </div>
+      <form id="patient-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="field span-2">
+              <label for="pf-full-name">Full name</label>
+              <input type="text" id="pf-full-name" required />
+            </div>
+            <div class="field">
+              <label for="pf-dob">Date of birth</label>
+              <input type="date" id="pf-dob" />
+            </div>
+            <div class="field">
+              <label for="pf-gender">Gender</label>
+              <select id="pf-gender">
+                <option value="">Select…</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="pf-phone">Phone</label>
+              <input type="text" id="pf-phone" placeholder="09xxxxxxxx" />
+            </div>
+            <div class="field">
+              <label for="pf-location">Location</label>
+              <input type="text" id="pf-location" placeholder="City / area" />
+            </div>
+            <div class="field span-2">
+              <label for="pf-address">Address</label>
+              <input type="text" id="pf-address" placeholder="Woreda, kebele, house no." />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <span class="footer-note" id="patient-form-note"></span>
+          <button type="button" class="btn btn-secondary" id="patient-form-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="patient-form-submit">Save Patient</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Patient Detail Modal -->
+  <div class="modal-backdrop" id="patient-detail-backdrop">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <div>
+          <h2 id="pd-name"></h2>
+          <p id="pd-code"></p>
+        </div>
+        <button class="icon-btn" id="patient-detail-close"></button>
+      </div>
+      <div class="modal-body" id="patient-detail-body"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="pd-edit-btn">Edit Patient</button>
+        <button class="btn btn-primary" id="pd-new-visit-btn">Start New Visit</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/patients.js"></script>
+</body>
+</html>

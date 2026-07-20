@@ -1,0 +1,119 @@
+/* ===========================================================
+   Shared UI helpers — toasts, formatting, badge mapping
+   =========================================================== */
+
+const UI = (() => {
+  function ensureToastRegion() {
+    let region = document.getElementById('toast-region');
+    if (!region) {
+      region = document.createElement('div');
+      region.id = 'toast-region';
+      document.body.appendChild(region);
+    }
+    return region;
+  }
+
+  function toast(message, type = 'default') {
+    const region = ensureToastRegion();
+    const el = document.createElement('div');
+    el.className = `toast${type === 'danger' ? ' toast-danger' : ''}`;
+    el.innerHTML = `${Icons.render(type === 'danger' ? 'alert' : 'check')}<span>${escapeHtml(message)}</span>`;
+    region.appendChild(el);
+    setTimeout(() => {
+      el.style.opacity = '0';
+      el.style.transition = 'opacity .2s ease';
+      setTimeout(() => el.remove(), 200);
+    }, 3200);
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str ?? '';
+    return div.innerHTML;
+  }
+
+  function formatDate(iso, opts = {}) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', ...opts });
+  }
+
+  function formatDateTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) +
+      ' · ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+
+  function age(dob) {
+    if (!dob) return '—';
+    const b = new Date(dob);
+    const diff = new Date() - b;
+    const years = diff / (1000 * 60 * 60 * 24 * 365.25);
+    return Math.floor(years);
+  }
+
+  const VISIT_STATUS_BADGE = {
+    open: 'badge-info',
+    examined: 'badge-warning',
+    diagnosed: 'badge-primary',
+    closed: 'badge-success',
+  };
+
+  const VISIT_STATUS_LABEL = {
+    open: 'Open',
+    examined: 'Examined',
+    diagnosed: 'Diagnosed',
+    closed: 'Closed',
+  };
+
+  function visitStatusBadge(status) {
+    const cls = VISIT_STATUS_BADGE[status] || 'badge-neutral';
+    const label = VISIT_STATUS_LABEL[status] || status;
+    return `<span class="badge ${cls}"><span class="badge-dot"></span>${label}</span>`;
+  }
+
+  function patientStatusBadge(isActive) {
+    return isActive
+      ? `<span class="badge badge-success"><span class="badge-dot"></span>Active</span>`
+      : `<span class="badge badge-neutral"><span class="badge-dot"></span>Inactive</span>`;
+  }
+
+  const REGISTRATION_STATUS_BADGE = {
+    pending: 'badge-info',
+    certified_fit: 'badge-success',
+    certified_unfit: 'badge-danger',
+    hired: 'badge-primary',
+    withdrawn: 'badge-neutral',
+  };
+  const REGISTRATION_STATUS_LABEL = {
+    pending: 'Pending',
+    certified_fit: 'Certified Fit',
+    certified_unfit: 'Certified Unfit',
+    hired: 'Hired',
+    withdrawn: 'Withdrawn',
+  };
+  function registrationStatusBadge(status) {
+    const cls = REGISTRATION_STATUS_BADGE[status] || 'badge-neutral';
+    const label = REGISTRATION_STATUS_LABEL[status] || status;
+    return `<span class="badge ${cls}"><span class="badge-dot"></span>${label}</span>`;
+  }
+
+  function certResultBadge(result) {
+    return result === 'fit'
+      ? `<span class="badge badge-success"><span class="badge-dot"></span>Fit</span>`
+      : `<span class="badge badge-danger"><span class="badge-dot"></span>Unfit</span>`;
+  }
+
+  function errorMessage(e) {
+    return (e && e.message) ? e.message : 'Something went wrong. Please try again.';
+  }
+
+  return { toast, escapeHtml, formatDate, formatDateTime, age, visitStatusBadge, patientStatusBadge, registrationStatusBadge, certResultBadge, errorMessage };
+})();
+
+// Escape key closes whichever modal is currently open, on any page.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('.modal-backdrop.visible').forEach(m => m.classList.remove('visible'));
+});

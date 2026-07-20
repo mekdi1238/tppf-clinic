@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard · TPPF Clinic</title>
+<link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" id="page-content">
+
+        <div class="stat-grid" id="stat-grid">
+          <!-- stat cards injected by dashboard.js -->
+        </div>
+
+        <div class="panel-grid">
+          <div class="panel">
+            <div class="panel-header">
+              <h3>Visits — last 7 days</h3>
+              <span class="panel-meta" id="visits-week-total"></span>
+            </div>
+            <div id="visits-line-chart"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <h3>Visit status breakdown</h3>
+              <span class="panel-meta">All visits</span>
+            </div>
+            <div id="visits-donut-chart"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Recent visits</h3>
+            <a href="visits.html" class="btn btn-ghost btn-sm">View all &rarr;</a>
+          </div>
+          <div id="recent-visits-table"></div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

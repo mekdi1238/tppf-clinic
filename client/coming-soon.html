@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Coming soon · TPPF Clinic</title>
+<link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" id="page-content">
+        <div class="coming-soon" id="coming-soon-body"></div>
+      </main>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+    const MODULES = {
+      'admissions': { key: 'admissions', title: 'Admissions', icon: 'admissions', desc: 'Track patients currently admitted as inpatients, with daily notes, admitting physician, and discharge — a lightweight status layered on top of a visit, not a full bed/ward system.', entities: ['admissions', 'admission_notes'] },
+      'employee-registrations': { key: 'employee-registrations', title: 'Employee Registrations', icon: 'employees', desc: 'Manage pre-employment candidates (R-series records) from registration through fitness certification and hiring.', entities: ['employee_registrations'] },
+      'certifications': { key: 'certifications', title: 'Certifications', icon: 'filecheck', desc: 'Record pre-employment medical exam results that determine whether a candidate is certified fit or unfit for hire.', entities: ['medical_certifications'] },
+      'laboratory': { key: 'laboratory', title: 'Laboratory', icon: 'flask', desc: 'Order and track lab tests tied to a visit, from the catalog of available tests through to completed results.', entities: ['lab_test_catalog', 'lab_orders', 'lab_order_items'] },
+      'pharmacy': { key: 'pharmacy', title: 'Pharmacy', icon: 'pill', desc: 'Prescribe and dispense medication against clinic drug stock, including partial dispensing across multiple pharmacy visits.', entities: ['drugs', 'drug_stock', 'prescriptions', 'prescription_items', 'dispensing_records'] },
+      'referrals': { key: 'referrals', title: 'Referrals & Certificates', icon: 'referrals', desc: 'Issue referrals to outside facilities and sick-leave certificates tied to a visit.', entities: ['referrals', 'sick_leaves'] },
+      'reports': { key: 'reports', title: 'Reports', icon: 'reports', desc: 'Clinic-wide reporting across patients, visits, and every other module once they\u2019re connected.', entities: ['(cross-module)'] },
+      'users': { key: 'users', title: 'Users & Roles', icon: 'users', desc: 'Manage staff login accounts and their roles — Receptionist, Physician, Lab Technician, Pharmacist, HR/Admin, System Administrator.', entities: ['users', 'roles', 'user_roles', 'audit_log'] },
+      'backup': { key: 'backup', title: 'Backup', icon: 'backup', desc: 'Trigger and download backups of the clinic database once it\u2019s connected.', entities: ['(system)'] },
+      'settings': { key: 'settings', title: 'Settings', icon: 'settings', desc: 'Clinic-wide configuration once the backend is in place.', entities: ['(system)'] },
+    };
+
+    Auth.requireAuth();
+    const params = new URLSearchParams(window.location.search);
+    const mod = MODULES[params.get('module')] || { key: '', title: 'This module', icon: 'info', desc: 'This part of the system is not built yet.', entities: [] };
+
+    renderShell(mod.key);
+    setPageTitle(mod.title);
+
+    document.getElementById('coming-soon-body').innerHTML = `
+      <div class="icon">${Icons.render(mod.icon)}</div>
+      <h2>${mod.title} is coming soon</h2>
+      <p>${mod.desc}</p>
+      <p class="text-muted">This page will connect automatically once the backend for it is ready.</p>
+      <div class="entities">
+        ${mod.entities.map(e => `<span>${e}</span>`).join('')}
+      </div>
+      <div style="margin-top:22px;">
+        <a href="dashboard.html" class="btn btn-secondary btn-sm">${Icons.render('dashboard')} Back to Dashboard</a>
+      </div>
+    `;
+  </script>
+</body>
+</html>
