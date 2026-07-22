@@ -3,6 +3,7 @@
    =========================================================== */
 
 Auth.requireAuth();
+if (RoleGuard.blockIfNotAllowed('visits')) { throw new Error('redirecting'); }
 renderShell('visits');
 setPageTitle('Visits');
 
@@ -129,15 +130,22 @@ document.getElementById('visit-form').addEventListener('submit', async (e) => {
 // ---------- Visit detail / update modal ----------
 async function openVisitDetail(id) {
   try {
-    const v = await Api.visits.get(id);
-    renderVisitDetail(v);
+    const [v, admissions, labOrders, prescriptions, referrals, sickLeaves] = await Promise.all([
+      Api.visits.get(id),
+      Api.admissions.list({ visit_id: id }),
+      Api.labOrders.list({ visit_id: id }),
+      Api.prescriptions.list({ visit_id: id }),
+      Api.referrals.list({ visit_id: id }),
+      Api.sickLeaves.list({ visit_id: id }),
+    ]);
+    renderVisitDetail(v, admissions[0] || null, labOrders, prescriptions, referrals, sickLeaves);
     document.getElementById('visit-detail-backdrop').classList.add('visible');
   } catch (e) {
     UI.toast(UI.errorMessage(e), 'danger');
   }
 }
 
-function renderVisitDetail(v) {
+function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, sickLeaves) {
   document.getElementById('vd-title').textContent = v.patient ? v.patient.full_name : 'Visit';
   document.getElementById('vd-sub').textContent = `${v.patient ? v.patient.patient_code : ''} · ${UI.formatDateTime(v.visit_date)}`;
 
@@ -178,8 +186,93 @@ function renderVisitDetail(v) {
       <button type="button" class="btn btn-secondary btn-sm" id="vd-save-notes" ${canEditClinical ? '' : 'style="display:none;"'}>Save notes</button>
     </div>
 
+    <div class="detail-section">
+      <h4>Admission</h4>
+      ${admission ? `
+        <div class="notice notice-info">
+          ${Icons.render('admissions')}
+          <span>${UI.admissionStatusBadge(admission.status)} — <a href="admissions.html?open=${admission.id}" style="text-decoration:underline;">View admission record</a></span>
+        </div>
+      ` : v.disposition === 'admitted' ? `
+        <div class="notice notice-warning">
+          ${Icons.render('alert')}
+          <span>Disposition is "Admitted" but no admission record exists yet. One is required before this visit can close.</span>
+        </div>
+        <a href="admissions.html?newFor=${v.id}" class="btn btn-secondary btn-sm">${Icons.render('plus')} Create Admission Record</a>
+      ` : `<p class="text-muted" style="font-size:12.5px;">Not applicable unless disposition is set to "Admitted".</p>`}
+    </div>
+
+    <div class="detail-section">
+      <h4>Lab orders (${labOrders.length})</h4>
+      ${labOrders.length ? `
+        <div class="timeline" style="margin-bottom:12px;">
+          ${labOrders.map(o => `
+            <div class="timeline-item">
+              <div class="timeline-dot"></div>
+              <div class="timeline-body">
+                <div class="t">${o.items.map(i => i.test ? UI.escapeHtml(i.test.code) : '?').join(', ')} ${UI.labOrderStatusBadge(o.status)}</div>
+                <div class="d">${UI.formatDateTime(o.order_date)}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      ` : `<p class="text-muted" style="font-size:12.5px; margin-bottom:12px;">No lab tests ordered for this visit.</p>`}
+      ${v.status !== 'closed' ? `<a href="laboratory.html?newFor=${v.id}" class="btn btn-secondary btn-sm">${Icons.render('plus')} Order Lab Tests</a>` : ''}
+    </div>
+
+    <div class="detail-section">
+      <h4>Prescriptions (${prescriptions.length})</h4>
+      ${prescriptions.length ? `
+        <div class="timeline" style="margin-bottom:12px;">
+          ${prescriptions.map(rx => `
+            <div class="timeline-item">
+              <div class="timeline-dot"></div>
+              <div class="timeline-body">
+                <div class="t">${rx.items.map(i => i.drug ? UI.escapeHtml(i.drug.name) : '?').join(', ')} ${UI.prescriptionStatusBadge(rx.status)}</div>
+                <div class="d">${UI.formatDateTime(rx.prescribed_date)}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      ` : `<p class="text-muted" style="font-size:12.5px; margin-bottom:12px;">No prescriptions written for this visit.</p>`}
+      ${v.status !== 'closed' ? `<a href="pharmacy.html?newFor=${v.id}" class="btn btn-secondary btn-sm">${Icons.render('plus')} Write Prescription</a>` : ''}
+    </div>
+
+    <div class="detail-section">
+      <h4>Referrals &amp; sick leave (${referrals.length + sickLeaves.length})</h4>
+      ${(referrals.length || sickLeaves.length) ? `
+        <div class="timeline" style="margin-bottom:12px;">
+          ${referrals.map(r => `
+            <div class="timeline-item">
+              <div class="timeline-dot"></div>
+              <div class="timeline-body">
+                <div class="t">Referred to ${UI.escapeHtml(r.referred_to)}</div>
+                <div class="d">${UI.formatDateTime(r.referral_date)}</div>
+              </div>
+            </div>
+          `).join('')}
+          ${sickLeaves.map(s => `
+            <div class="timeline-item">
+              <div class="timeline-dot"></div>
+              <div class="timeline-body">
+                <div class="t">Sick leave: ${UI.formatDate(s.leave_start)} — ${UI.formatDate(s.leave_end)}</div>
+                <div class="d">Exam ${UI.formatDate(s.exam_date)}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      ` : `<p class="text-muted" style="font-size:12.5px; margin-bottom:12px;">No referrals or sick leave certificates for this visit.</p>`}
+      ${v.status !== 'closed' ? `
+        <div style="display:flex; gap:8px;">
+          <a href="referrals.html?newFor=${v.id}" class="btn btn-secondary btn-sm">${Icons.render('plus')} New Referral</a>
+          <a href="referrals.html?newFor=${v.id}&type=sickleave" class="btn btn-secondary btn-sm">${Icons.render('plus')} New Sick Leave</a>
+        </div>
+      ` : ''}
+    </div>
+
     <div id="vd-block-notice"></div>
   `;
+
 
   if (canEditClinical) {
     document.getElementById('vd-save-notes').addEventListener('click', async (e) => {
@@ -245,8 +338,15 @@ function renderVisitDetail(v) {
       try {
         const updated = await Api.visits.update(v.id, payload);
         UI.toast(`Visit moved to "${updated.status}".`);
-        const full = await Api.visits.get(v.id);
-        renderVisitDetail(full);
+        const [full, admissions, labOrders, prescriptions, referrals, sickLeaves] = await Promise.all([
+          Api.visits.get(v.id),
+          Api.admissions.list({ visit_id: v.id }),
+          Api.labOrders.list({ visit_id: v.id }),
+          Api.prescriptions.list({ visit_id: v.id }),
+          Api.referrals.list({ visit_id: v.id }),
+          Api.sickLeaves.list({ visit_id: v.id }),
+        ]);
+        renderVisitDetail(full, admissions[0] || null, labOrders, prescriptions, referrals, sickLeaves);
         loadVisits();
       } catch (e) {
         document.getElementById('vd-block-notice').innerHTML = `

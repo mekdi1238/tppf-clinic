@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Backup · TPPF Clinic</title>
+<link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" id="page-content">
+
+        <div class="notice notice-info">
+          <span id="header-info-icon"></span>
+          <span>This page is an admin shell for backups. Actually generating and storing a database dump is server-side work — see BACKEND_HANDOFF.md. Backups listed here are placeholders.</span>
+        </div>
+
+        <div class="page-toolbar">
+          <div></div>
+          <button class="btn btn-primary" id="new-backup-btn">
+            <span id="plus-icon-slot"></span> Create Backup Now
+          </button>
+        </div>
+
+        <div id="backups-table-region"></div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/backup.js"></script>
+</body>
+</html>

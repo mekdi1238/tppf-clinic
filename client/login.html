@@ -58,7 +58,10 @@
     document.getElementById('login-alert-icon').innerHTML = Icons.render('alert');
 
     if (Auth.isLoggedIn()) {
-      window.location.href = 'dashboard.html';
+      // Don't silently bounce back to the old session — that would make
+      // it impossible to switch users without finding the Logout button
+      // first. Clear the stale session so the login form is always usable.
+      Auth.clearSession();
     }
 
     const form = document.getElementById('login-form');

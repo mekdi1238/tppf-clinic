@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admissions · TPPF Clinic</title>
+<link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" id="page-content">
+
+        <div class="notice notice-info">
+          <span id="header-info-icon"></span>
+          <span>Admissions track inpatient status only — no bed or ward assignment. A visit must have disposition "Admitted" before it can be turned into an admission record.</span>
+        </div>
+
+        <div class="page-toolbar">
+          <div class="toolbar-filters">
+            <div class="search-box">
+              <span id="search-icon-slot"></span>
+              <input type="text" id="search-input" placeholder="Search by patient name or code…" />
+            </div>
+            <select class="select-filter" id="status-filter">
+              <option value="all">All statuses</option>
+              <option value="admitted">Currently admitted</option>
+              <option value="discharged">Discharged</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="new-admission-btn">
+            <span id="plus-icon-slot"></span> New Admission
+          </button>
+        </div>
+
+        <div id="admissions-table-region"></div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- New Admission Modal -->
+  <div class="modal-backdrop" id="adm-modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2>New Admission</h2>
+          <p>Open an inpatient record for a visit marked "Admitted".</p>
+        </div>
+        <button class="icon-btn" id="adm-modal-close"></button>
+      </div>
+      <form id="adm-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="field span-2">
+              <label for="af-visit">Visit</label>
+              <select id="af-visit" required></select>
+              <div class="hint" id="af-visit-hint">Only visits with disposition "Admitted" and no existing admission are eligible.</div>
+            </div>
+            <div class="field span-2">
+              <label for="af-physician">Admitting physician</label>
+              <select id="af-physician" required></select>
+            </div>
+            <div class="field span-2">
+              <label for="af-reason">Reason for admission</label>
+              <textarea id="af-reason" rows="3" required></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="adm-form-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="adm-form-submit">Admit Patient</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admission Detail Modal -->
+  <div class="modal-backdrop" id="adm-detail-backdrop">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <div>
+          <h2 id="ad-name"></h2>
+          <p id="ad-sub"></p>
+        </div>
+        <button class="icon-btn" id="adm-detail-close"></button>
+      </div>
+      <div class="modal-body" id="adm-detail-body"></div>
+      <div class="modal-footer" id="adm-detail-footer"></div>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/admissions.js"></script>
+</body>
+</html>

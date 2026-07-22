@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Settings · TPPF Clinic</title>
+<link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" id="page-content">
+
+        <div class="panel" id="clinic-profile-panel" style="max-width:640px; margin-bottom:20px;">
+          <div class="panel-header"><h3>Clinic Profile</h3></div>
+          <form id="clinic-form">
+            <div class="form-grid">
+              <div class="field span-2">
+                <label for="cf-name">Clinic name</label>
+                <input type="text" id="cf-name" />
+              </div>
+              <div class="field span-2">
+                <label for="cf-tagline">Tagline</label>
+                <input type="text" id="cf-tagline" />
+              </div>
+              <div class="field span-2">
+                <label for="cf-address">Address</label>
+                <input type="text" id="cf-address" />
+              </div>
+              <div class="field span-2">
+                <label for="cf-phone">Phone</label>
+                <input type="text" id="cf-phone" />
+              </div>
+            </div>
+            <div style="margin-top:16px;">
+              <button type="submit" class="btn btn-primary" id="clinic-form-submit">Save Clinic Profile</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="panel" style="max-width:640px;">
+          <div class="panel-header"><h3>My Account</h3></div>
+          <div class="detail-grid" style="margin-bottom:16px;">
+            <div class="detail-item"><div class="k">Username</div><div class="v" id="acct-username"></div></div>
+            <div class="detail-item"><div class="k">Full name</div><div class="v" id="acct-fullname"></div></div>
+            <div class="detail-item" style="grid-column:1/-1;"><div class="k">Roles</div><div class="v" id="acct-roles"></div></div>
+          </div>
+          <form id="password-form">
+            <div class="form-grid">
+              <div class="field span-2">
+                <label for="pf-current">Current password</label>
+                <input type="password" id="pf-current" required />
+              </div>
+              <div class="field">
+                <label for="pf-new">New password</label>
+                <input type="password" id="pf-new" required />
+              </div>
+              <div class="field">
+                <label for="pf-confirm">Confirm new password</label>
+                <input type="password" id="pf-confirm" required />
+              </div>
+            </div>
+            <div style="margin-top:16px;">
+              <button type="submit" class="btn btn-primary" id="password-form-submit">Change Password</button>
+            </div>
+          </form>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/settings.js"></script>
+</body>
+</html>

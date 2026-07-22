@@ -1,3 +1,7 @@
+-- Migration 0009: Referrals & Certificates
+-- Depends on: visits (0005), patients (0003), physicians (0001).
+-- Maps to Entity Dictionary section 8.
+
 -- +migrate Up
 
 CREATE TABLE referrals (

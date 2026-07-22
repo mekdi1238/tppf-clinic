@@ -130,8 +130,88 @@ function renderRecentVisits(visits) {
   `;
 }
 
+async function renderLabTechDashboard() {
+  const orders = await Api.labOrders.list();
+  const pending = orders.filter(o => o.status === 'pending').length;
+  const inProgress = orders.filter(o => o.status === 'in_progress').length;
+  const todayStr = new Date().toDateString();
+  const completedToday = orders.filter(o => o.status === 'completed' && new Date(o.order_date).toDateString() === todayStr).length;
+  const queue = orders.filter(o => o.status !== 'completed').slice(0, 8);
+
+  document.getElementById('page-content').innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card"><div><div class="label">Pending Orders</div><div class="value">${pending}</div></div><div class="stat-icon">${Icons.render('flask')}</div></div>
+      <div class="stat-card"><div><div class="label">In Progress</div><div class="value">${inProgress}</div></div><div class="stat-icon amber">${Icons.render('activity')}</div></div>
+      <div class="stat-card"><div><div class="label">Completed Today</div><div class="value">${completedToday}</div></div><div class="stat-icon success">${Icons.render('check')}</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <h3>My queue</h3>
+        <a href="laboratory.html" class="btn btn-ghost btn-sm">Open Laboratory &rarr;</a>
+      </div>
+      ${queue.length ? `
+        <div class="table-wrap" style="box-shadow:none; border:none;">
+          <table class="data-table">
+            <thead><tr><th>Patient</th><th>Tests</th><th>Ordered</th><th>Status</th></tr></thead>
+            <tbody>
+              ${queue.map(o => `
+                <tr onclick="window.location.href='laboratory.html?open=${o.id}'" style="cursor:pointer;">
+                  <td class="cell-primary">${UI.escapeHtml(o.patient_name)} <span class="cell-code">${UI.escapeHtml(o.patient_code)}</span></td>
+                  <td class="cell-muted">${o.items.map(i => i.test ? UI.escapeHtml(i.test.code) : '?').join(', ')}</td>
+                  <td class="cell-muted">${UI.formatDateTime(o.order_date)}</td>
+                  <td>${UI.labOrderStatusBadge(o.status)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : `<div class="empty-state"><div class="empty-icon">${Icons.render('flask')}</div><h3>Queue is empty</h3><p>No pending or in-progress lab orders right now.</p></div>`}
+    </div>
+  `;
+}
+
+async function renderPharmacistDashboard() {
+  const [prescriptions, drugs] = await Promise.all([Api.prescriptions.list({ status: 'active' }), Api.drugs.list()]);
+  const lowStock = drugs.filter(d => d.stock && d.stock.quantity_on_hand <= d.stock.reorder_threshold);
+  const queue = prescriptions.slice(0, 8);
+
+  document.getElementById('page-content').innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card"><div><div class="label">Active Prescriptions</div><div class="value">${prescriptions.length}</div></div><div class="stat-icon">${Icons.render('pill')}</div></div>
+      <div class="stat-card"><div><div class="label">Drugs Below Reorder Threshold</div><div class="value">${lowStock.length}</div></div><div class="stat-icon amber">${Icons.render('alert')}</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <h3>Prescriptions to dispense</h3>
+        <a href="pharmacy.html" class="btn btn-ghost btn-sm">Open Pharmacy &rarr;</a>
+      </div>
+      ${queue.length ? `
+        <div class="table-wrap" style="box-shadow:none; border:none;">
+          <table class="data-table">
+            <thead><tr><th>Patient</th><th>Drugs</th><th>Prescribed</th><th>Status</th></tr></thead>
+            <tbody>
+              ${queue.map(rx => `
+                <tr onclick="window.location.href='pharmacy.html?open=${rx.id}'" style="cursor:pointer;">
+                  <td class="cell-primary">${UI.escapeHtml(rx.patient_name)} <span class="cell-code">${UI.escapeHtml(rx.patient_code)}</span></td>
+                  <td class="cell-muted">${rx.items.map(i => i.drug ? UI.escapeHtml(i.drug.name) : '?').join(', ')}</td>
+                  <td class="cell-muted">${UI.formatDateTime(rx.prescribed_date)}</td>
+                  <td>${UI.prescriptionStatusBadge(rx.status)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : `<div class="empty-state"><div class="empty-icon">${Icons.render('pill')}</div><h3>Queue is empty</h3><p>No active prescriptions waiting on dispensing right now.</p></div>`}
+    </div>
+  `;
+}
+
 async function init() {
+  const role = RoleGuard.restrictedRole();
   try {
+    if (role === 'lab_technician') { await renderLabTechDashboard(); return; }
+    if (role === 'pharmacist') { await renderPharmacistDashboard(); return; }
+
     const [stats, visits] = await Promise.all([Api.dashboardStats(), Api.visits.list()]);
     renderStatCards(stats);
     renderLineChart(stats.visits_by_day);

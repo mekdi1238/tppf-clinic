@@ -1,3 +1,12 @@
+-- Migration 0004: Certification
+-- Depends on: employee_registrations (0001), physicians (0001).
+-- Maps to Entity Dictionary section 3.
+--
+-- Note: this single table replaces BOTH "Medical Certification" and
+-- "Medical Certification IU" from the old Access system. Confirmed on
+-- Day 1 that IU was a duplicate, not a distinct workflow, so there is
+-- deliberately no separate table or "type" column for it here.
+
 -- +migrate Up
 
 CREATE TABLE medical_certifications (
@@ -17,6 +26,10 @@ CREATE TABLE medical_certifications (
     treatment_result_note     TEXT,
     created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
 
+    -- Nullable on purpose: the result isn't known until the exam is
+    -- actually complete, but once it IS set, it can only be one of these
+    -- two values. This is what the "hire this candidate" business rule
+    -- (see the application layer, Day 4) checks against.
     CONSTRAINT chk_medical_certifications_result
         CHECK (result IS NULL OR result IN ('fit', 'unfit'))
 );

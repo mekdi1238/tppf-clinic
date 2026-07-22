@@ -3,6 +3,7 @@
    =========================================================== */
 
 Auth.requireAuth();
+if (RoleGuard.blockIfNotAllowed('employee-registrations')) { throw new Error('redirecting'); }
 renderShell('employee-registrations');
 setPageTitle('Employee Registrations');
 

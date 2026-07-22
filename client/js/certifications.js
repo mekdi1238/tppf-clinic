@@ -3,6 +3,7 @@
    =========================================================== */
 
 Auth.requireAuth();
+if (RoleGuard.blockIfNotAllowed('certifications')) { throw new Error('redirecting'); }
 renderShell('certifications');
 setPageTitle('Certifications');
 

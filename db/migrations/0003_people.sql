@@ -1,3 +1,7 @@
+-- Migration 0003: Patients & Attachments
+-- Depends on: employee_registrations (0001).
+-- Maps to Entity Dictionary section 2 (patients), section 9 (attachments).
+
 -- +migrate Up
 
 CREATE TABLE patients (
@@ -9,6 +13,11 @@ CREATE TABLE patients (
     location                          TEXT,
     address                           TEXT,
     phone                             TEXT,
+    -- Nullable: only set when this patient originated as a hired
+    -- employee_registrations candidate. NULL means a direct/walk-in
+    -- registration. This is the R -> S lifecycle link agreed on Day 1:
+    -- hiring creates a NEW patient row and permanently links back to the
+    -- original registration, rather than converting/overwriting it.
     source_employee_registration_id  INTEGER REFERENCES employee_registrations(id),
     registered_date                   TIMESTAMPTZ NOT NULL DEFAULT now(),
     is_active                         BOOLEAN NOT NULL DEFAULT true,
@@ -23,6 +32,12 @@ CREATE INDEX idx_patients_source_employee_registration_id
 
 CREATE TABLE attachments (
     id           INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    -- owner_table + owner_id is a "polymorphic" reference: this one table
+    -- stores photos for three different parent tables (patients,
+    -- physicians, employee_registrations), so it can't use a normal single
+    -- foreign key. The CHECK constraint below is the trade-off: it can't
+    -- guarantee owner_id actually exists (a real FK would), but it at
+    -- least rejects garbage/typo values in owner_table.
     owner_table  TEXT NOT NULL,
     owner_id     INTEGER NOT NULL,
     file_name    TEXT,

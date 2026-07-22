@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pharmacy · TPPF Clinic</title>
+<link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" id="page-content">
+
+        <div class="tab-bar">
+          <button type="button" class="tab-btn active" id="tab-btn-prescriptions">Prescriptions</button>
+          <button type="button" class="tab-btn" id="tab-btn-stock">Drug Stock</button>
+        </div>
+
+        <!-- Prescriptions tab -->
+        <div id="tab-prescriptions">
+          <div class="page-toolbar">
+            <div class="toolbar-filters">
+              <div class="search-box">
+                <span id="search-icon-slot"></span>
+                <input type="text" id="search-input" placeholder="Search by patient name or code…" />
+              </div>
+              <select class="select-filter" id="status-filter">
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="fulfilled">Fulfilled</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" id="new-rx-btn">
+              <span id="plus-icon-slot"></span> New Prescription
+            </button>
+          </div>
+          <div id="rx-table-region"></div>
+        </div>
+
+        <!-- Drug Stock tab -->
+        <div id="tab-stock" style="display:none;">
+          <div class="page-toolbar">
+            <div class="toolbar-filters">
+              <div class="search-box">
+                <span id="stock-search-icon-slot"></span>
+                <input type="text" id="stock-search-input" placeholder="Search drugs…" />
+              </div>
+            </div>
+            <button class="btn btn-primary" id="new-drug-btn">
+              <span id="drug-plus-icon-slot"></span> Add Drug
+            </button>
+          </div>
+          <div id="stock-table-region"></div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- New Prescription Modal -->
+  <div class="modal-backdrop" id="rx-modal-backdrop">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <div>
+          <h2>New Prescription</h2>
+          <p>Prescribe drugs for an open visit.</p>
+        </div>
+        <button class="icon-btn" id="rx-modal-close"></button>
+      </div>
+      <form id="rx-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="field span-2">
+              <label for="rf-visit">Visit</label>
+              <select id="rf-visit" required></select>
+              <div class="hint">Only visits that aren't closed yet are eligible.</div>
+            </div>
+            <div class="field span-2">
+              <label for="rf-physician">Prescribing physician</label>
+              <select id="rf-physician" required></select>
+            </div>
+            <div class="field span-2">
+              <label for="rf-diagnosis-note">Diagnosis / note</label>
+              <input type="text" id="rf-diagnosis-note" placeholder="Optional" />
+            </div>
+            <div class="field span-2">
+              <label>Drugs</label>
+              <div id="rx-items-list"></div>
+              <button type="button" class="btn btn-secondary btn-sm" id="rx-add-item-btn" style="margin-top:8px;">+ Add Drug Line</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="rx-form-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="rx-form-submit">Save Prescription</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Prescription Detail / Dispense Modal -->
+  <div class="modal-backdrop" id="rx-detail-backdrop">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <div>
+          <h2 id="rxd-name"></h2>
+          <p id="rxd-sub"></p>
+        </div>
+        <button class="icon-btn" id="rx-detail-close"></button>
+      </div>
+      <div class="modal-body" id="rx-detail-body"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="rx-detail-close-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Drug Modal -->
+  <div class="modal-backdrop" id="drug-modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2>Add Drug</h2>
+          <p>Add a new drug to the clinic formulary.</p>
+        </div>
+        <button class="icon-btn" id="drug-modal-close"></button>
+      </div>
+      <form id="drug-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="field span-2">
+              <label for="df-name">Name</label>
+              <input type="text" id="df-name" required />
+            </div>
+            <div class="field">
+              <label for="df-unit">Unit</label>
+              <input type="text" id="df-unit" placeholder="tablet, capsule, sachet…" />
+            </div>
+            <div class="field">
+              <label for="df-quantity">Initial quantity</label>
+              <input type="number" id="df-quantity" min="0" value="0" />
+            </div>
+            <div class="field">
+              <label for="df-threshold">Reorder threshold</label>
+              <input type="number" id="df-threshold" min="0" value="0" />
+            </div>
+            <div class="field span-2">
+              <label for="df-description">Description</label>
+              <input type="text" id="df-description" placeholder="Optional" />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="drug-form-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="drug-form-submit">Save Drug</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Restock Modal -->
+  <div class="modal-backdrop" id="restock-modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2 id="restock-title">Adjust Stock</h2>
+          <p>Enter a positive number to restock, negative to correct.</p>
+        </div>
+        <button class="icon-btn" id="restock-modal-close"></button>
+      </div>
+      <form id="restock-form">
+        <div class="modal-body">
+          <div class="field">
+            <label for="rs-delta">Quantity change</label>
+            <input type="number" id="rs-delta" required />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="restock-form-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="restock-form-submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/pharmacy.js"></script>
+</body>
+</html>

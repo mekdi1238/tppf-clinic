@@ -14,7 +14,7 @@ const NAV_SECTIONS = [
     items: [
       { key: 'patients', label: 'Patients', icon: 'patients', href: 'patients.html', active: true },
       { key: 'visits', label: 'Visits', icon: 'visits', href: 'visits.html', active: true },
-      { key: 'admissions', label: 'Admissions', icon: 'admissions', href: 'coming-soon.html?module=admissions', active: false },
+      { key: 'admissions', label: 'Admissions', icon: 'admissions', href: 'admissions.html', active: true },
     ],
   },
   {
@@ -27,18 +27,18 @@ const NAV_SECTIONS = [
   {
     label: 'Clinical Support',
     items: [
-      { key: 'laboratory', label: 'Laboratory', icon: 'flask', href: 'coming-soon.html?module=laboratory', active: false },
-      { key: 'pharmacy', label: 'Pharmacy', icon: 'pill', href: 'coming-soon.html?module=pharmacy', active: false },
-      { key: 'referrals', label: 'Referrals & Certificates', icon: 'referrals', href: 'coming-soon.html?module=referrals', active: false },
+      { key: 'laboratory', label: 'Laboratory', icon: 'flask', href: 'laboratory.html', active: true },
+      { key: 'pharmacy', label: 'Pharmacy', icon: 'pill', href: 'pharmacy.html', active: true },
+      { key: 'referrals', label: 'Referrals & Certificates', icon: 'referrals', href: 'referrals.html', active: true },
     ],
   },
   {
     label: 'Administration',
     items: [
-      { key: 'reports', label: 'Reports', icon: 'reports', href: 'coming-soon.html?module=reports', active: false },
-      { key: 'users', label: 'Users & Roles', icon: 'users', href: 'coming-soon.html?module=users', active: false },
-      { key: 'backup', label: 'Backup', icon: 'backup', href: 'coming-soon.html?module=backup', active: false },
-      { key: 'settings', label: 'Settings', icon: 'settings', href: 'coming-soon.html?module=settings', active: false },
+      { key: 'reports', label: 'Reports', icon: 'reports', href: 'reports.html', active: true },
+      { key: 'users', label: 'Users & Roles', icon: 'users', href: 'users.html', active: true },
+      { key: 'backup', label: 'Backup', icon: 'backup', href: 'backup.html', active: true },
+      { key: 'settings', label: 'Settings', icon: 'settings', href: 'settings.html', active: true },
     ],
   },
 ];
@@ -54,6 +54,14 @@ function renderNavItem(item, activeKey) {
 
 function renderShell(activeKey) {
   const session = Auth.getSession();
+  const allowedKeys = RoleGuard.allowedNavKeys();
+  const visibleSections = NAV_SECTIONS
+    .map(section => ({
+      ...section,
+      items: allowedKeys ? section.items.filter(item => allowedKeys.includes(item.key)) : section.items,
+    }))
+    .filter(section => section.items.length > 0);
+
   const sidebarHtml = `
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-brand">
@@ -71,7 +79,7 @@ function renderShell(activeKey) {
         </div>
       </div>
       <nav class="sidebar-nav">
-        ${NAV_SECTIONS.map(section => `
+        ${visibleSections.map(section => `
           <div class="nav-section-label">${section.label}</div>
           ${section.items.map(item => renderNavItem(item, activeKey)).join('')}
         `).join('')}

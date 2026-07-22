@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Users & Roles · TPPF Clinic</title>
+<link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" id="page-content">
+
+        <div class="page-toolbar">
+          <div class="toolbar-filters">
+            <div class="search-box">
+              <span id="search-icon-slot"></span>
+              <input type="text" id="search-input" placeholder="Search by username or name…" />
+            </div>
+            <select class="select-filter" id="status-filter">
+              <option value="all">All statuses</option>
+              <option value="active">Active only</option>
+              <option value="inactive">Inactive only</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="new-user-btn">
+            <span id="plus-icon-slot"></span> New User
+          </button>
+        </div>
+
+        <div id="users-table-region"></div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- New User Modal -->
+  <div class="modal-backdrop" id="user-modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2>New User</h2>
+          <p>Create a login for clinic staff.</p>
+        </div>
+        <button class="icon-btn" id="user-modal-close"></button>
+      </div>
+      <form id="user-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="field">
+              <label for="uf-username">Username</label>
+              <input type="text" id="uf-username" required />
+            </div>
+            <div class="field">
+              <label for="uf-password">Temporary password</label>
+              <input type="text" id="uf-password" required />
+              <div class="hint">At least 6 characters. Share this with the staff member directly.</div>
+            </div>
+            <div class="field span-2">
+              <label for="uf-full-name">Full name</label>
+              <input type="text" id="uf-full-name" />
+            </div>
+            <div class="field span-2">
+              <label for="uf-physician">Linked physician (optional)</label>
+              <select id="uf-physician"><option value="">None</option></select>
+              <div class="hint">Only for accounts belonging to a clinical physician.</div>
+            </div>
+            <div class="field span-2">
+              <label>Roles</label>
+              <div id="uf-roles-list" style="border:1px solid var(--color-border-strong); border-radius:var(--radius-sm); padding:10px 12px;"></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="user-form-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="user-form-submit">Create User</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit User Modal -->
+  <div class="modal-backdrop" id="user-edit-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2 id="ue-title"></h2>
+          <p id="ue-sub"></p>
+        </div>
+        <button class="icon-btn" id="user-edit-close"></button>
+      </div>
+      <form id="user-edit-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="field span-2">
+              <label for="ue-full-name">Full name</label>
+              <input type="text" id="ue-full-name" />
+            </div>
+            <div class="field span-2">
+              <label for="ue-physician">Linked physician</label>
+              <select id="ue-physician"><option value="">None</option></select>
+            </div>
+            <div class="field span-2">
+              <label>Roles</label>
+              <div id="ue-roles-list" style="border:1px solid var(--color-border-strong); border-radius:var(--radius-sm); padding:10px 12px;"></div>
+            </div>
+          </div>
+          <div id="user-edit-notice"></div>
+        </div>
+        <div class="modal-footer">
+          <span class="footer-note" id="ue-footer-note"></span>
+          <button type="button" class="btn btn-secondary btn-sm" id="ue-reset-password-btn">Reset Password</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="ue-toggle-active-btn"></button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/users.js"></script>
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Referrals & Certificates · TPPF Clinic</title>
+<link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" id="page-content">
+
+        <div class="tab-bar">
+          <button type="button" class="tab-btn active" id="tab-btn-referrals">Referrals</button>
+          <button type="button" class="tab-btn" id="tab-btn-sickleaves">Sick Leave Certificates</button>
+        </div>
+
+        <!-- Referrals tab -->
+        <div id="tab-referrals">
+          <div class="page-toolbar">
+            <div class="toolbar-filters">
+              <div class="search-box">
+                <span id="search-icon-slot"></span>
+                <input type="text" id="search-input" placeholder="Search by patient name or code…" />
+              </div>
+            </div>
+            <button class="btn btn-primary" id="new-referral-btn">
+              <span id="plus-icon-slot"></span> New Referral
+            </button>
+          </div>
+          <div id="referrals-table-region"></div>
+        </div>
+
+        <!-- Sick leaves tab -->
+        <div id="tab-sickleaves" style="display:none;">
+          <div class="page-toolbar">
+            <div class="toolbar-filters">
+              <div class="search-box">
+                <span id="sl-search-icon-slot"></span>
+                <input type="text" id="sl-search-input" placeholder="Search by patient name or code…" />
+              </div>
+            </div>
+            <button class="btn btn-primary" id="new-sickleave-btn">
+              <span id="sl-plus-icon-slot"></span> New Sick Leave
+            </button>
+          </div>
+          <div id="sickleaves-table-region"></div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- New Referral Modal -->
+  <div class="modal-backdrop" id="referral-modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2>New Referral</h2>
+          <p>Refer a patient to an outside facility.</p>
+        </div>
+        <button class="icon-btn" id="referral-modal-close"></button>
+      </div>
+      <form id="referral-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="field span-2">
+              <label for="rf-visit">Visit</label>
+              <select id="rf-visit" required></select>
+              <div class="hint">Only visits that aren't closed yet are eligible.</div>
+            </div>
+            <div class="field span-2">
+              <label for="rf-physician">Referring physician</label>
+              <select id="rf-physician" required></select>
+            </div>
+            <div class="field span-2">
+              <label for="rf-diagnosis">Diagnosis</label>
+              <input type="text" id="rf-diagnosis" />
+            </div>
+            <div class="field span-2">
+              <label for="rf-referred-to">Referred to</label>
+              <input type="text" id="rf-referred-to" placeholder="Facility or department name" required />
+            </div>
+            <div class="field span-2">
+              <label for="rf-reason">Reason for referral</label>
+              <textarea id="rf-reason" rows="2"></textarea>
+            </div>
+            <div class="field span-2">
+              <label for="rf-note">Additional note</label>
+              <textarea id="rf-note" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="referral-form-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="referral-form-submit">Save Referral</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Referral Detail Modal -->
+  <div class="modal-backdrop" id="referral-detail-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2 id="rfd-name"></h2>
+          <p id="rfd-sub"></p>
+        </div>
+        <button class="icon-btn" id="referral-detail-close"></button>
+      </div>
+      <div class="modal-body" id="referral-detail-body"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="referral-detail-close-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Sick Leave Modal -->
+  <div class="modal-backdrop" id="sl-modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2>New Sick Leave Certificate</h2>
+          <p>Issue a sick leave certificate for a visit.</p>
+        </div>
+        <button class="icon-btn" id="sl-modal-close"></button>
+      </div>
+      <form id="sl-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="field span-2">
+              <label for="sf-visit">Visit</label>
+              <select id="sf-visit" required></select>
+              <div class="hint">Only visits that aren't closed yet are eligible.</div>
+            </div>
+            <div class="field span-2">
+              <label for="sf-physician">Certifying physician</label>
+              <select id="sf-physician" required></select>
+            </div>
+            <div class="field span-2">
+              <label for="sf-diagnosis">Diagnosis</label>
+              <input type="text" id="sf-diagnosis" />
+            </div>
+            <div class="field">
+              <label for="sf-start">Leave start</label>
+              <input type="date" id="sf-start" required />
+            </div>
+            <div class="field">
+              <label for="sf-end">Leave end</label>
+              <input type="date" id="sf-end" required />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="sl-form-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="sl-form-submit">Save Certificate</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Sick Leave Detail Modal -->
+  <div class="modal-backdrop" id="sl-detail-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2 id="sld-name"></h2>
+          <p id="sld-sub"></p>
+        </div>
+        <button class="icon-btn" id="sl-detail-close"></button>
+      </div>
+      <div class="modal-body" id="sl-detail-body"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="sl-detail-close-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/referrals.js"></script>
+</body>
+</html>

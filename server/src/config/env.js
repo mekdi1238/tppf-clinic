@@ -1,3 +1,12 @@
+/**
+ * Loads and validates environment variables once, at startup, in one
+ * place. The rest of the codebase imports `config` from here instead of
+ * reading `process.env` directly all over the place — that way, a missing
+ * or malformed setting fails loudly and immediately when the server
+ * starts, rather than causing a confusing error somewhere deep in a
+ * request handler hours later.
+ */
+
 require("dotenv").config();
 
 const required = ["DATABASE_URL", "JWT_SECRET"];

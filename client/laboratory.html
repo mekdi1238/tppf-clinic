@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Laboratory · TPPF Clinic</title>
+<link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" id="page-content">
+
+        <div class="page-toolbar">
+          <div class="toolbar-filters">
+            <div class="search-box">
+              <span id="search-icon-slot"></span>
+              <input type="text" id="search-input" placeholder="Search by patient name or code…" />
+            </div>
+            <select class="select-filter" id="status-filter">
+              <option value="all">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="new-order-btn">
+            <span id="plus-icon-slot"></span> New Lab Order
+          </button>
+        </div>
+
+        <div id="orders-table-region"></div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- New Lab Order Modal -->
+  <div class="modal-backdrop" id="order-modal-backdrop">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <div>
+          <h2>New Lab Order</h2>
+          <p>Order tests for an open visit.</p>
+        </div>
+        <button class="icon-btn" id="order-modal-close"></button>
+      </div>
+      <form id="order-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="field span-2">
+              <label for="of-visit">Visit</label>
+              <select id="of-visit" required></select>
+              <div class="hint">Only visits that aren't closed yet are eligible.</div>
+            </div>
+            <div class="field span-2">
+              <label for="of-physician">Ordering physician</label>
+              <select id="of-physician" required></select>
+            </div>
+            <div class="field span-2">
+              <label>Tests</label>
+              <div id="of-tests-list" style="border:1px solid var(--color-border-strong); border-radius:var(--radius-sm); padding:10px 12px; max-height:220px; overflow-y:auto;"></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="order-form-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="order-form-submit">Create Order</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Order Detail Modal -->
+  <div class="modal-backdrop" id="order-detail-backdrop">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <div>
+          <h2 id="od-name"></h2>
+          <p id="od-sub"></p>
+        </div>
+        <button class="icon-btn" id="order-detail-close"></button>
+      </div>
+      <div class="modal-body" id="order-detail-body"></div>
+      <div class="modal-footer" id="order-detail-footer"></div>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/laboratory.js"></script>
+</body>
+</html>

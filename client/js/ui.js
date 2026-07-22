@@ -105,11 +105,38 @@ const UI = (() => {
       : `<span class="badge badge-danger"><span class="badge-dot"></span>Unfit</span>`;
   }
 
+  function admissionStatusBadge(status) {
+    return status === 'admitted'
+      ? `<span class="badge badge-info"><span class="badge-dot"></span>Admitted</span>`
+      : `<span class="badge badge-success"><span class="badge-dot"></span>Discharged</span>`;
+  }
+
+  const LAB_STATUS_BADGE = { pending: 'badge-neutral', in_progress: 'badge-warning', completed: 'badge-success' };
+  const LAB_STATUS_LABEL = { pending: 'Pending', in_progress: 'In Progress', completed: 'Completed' };
+  function labOrderStatusBadge(status) {
+    const cls = LAB_STATUS_BADGE[status] || 'badge-neutral';
+    const label = LAB_STATUS_LABEL[status] || status;
+    return `<span class="badge ${cls}"><span class="badge-dot"></span>${label}</span>`;
+  }
+
+  function prescriptionStatusBadge(status) {
+    return status === 'fulfilled'
+      ? `<span class="badge badge-success"><span class="badge-dot"></span>Fulfilled</span>`
+      : `<span class="badge badge-info"><span class="badge-dot"></span>Active</span>`;
+  }
+
+  function stockBadge(stock) {
+    if (!stock) return `<span class="badge badge-neutral"><span class="badge-dot"></span>No stock record</span>`;
+    return stock.quantity_on_hand <= stock.reorder_threshold
+      ? `<span class="badge badge-danger"><span class="badge-dot"></span>Low stock</span>`
+      : `<span class="badge badge-success"><span class="badge-dot"></span>In stock</span>`;
+  }
+
   function errorMessage(e) {
     return (e && e.message) ? e.message : 'Something went wrong. Please try again.';
   }
 
-  return { toast, escapeHtml, formatDate, formatDateTime, age, visitStatusBadge, patientStatusBadge, registrationStatusBadge, certResultBadge, errorMessage };
+  return { toast, escapeHtml, formatDate, formatDateTime, age, visitStatusBadge, patientStatusBadge, registrationStatusBadge, certResultBadge, admissionStatusBadge, labOrderStatusBadge, prescriptionStatusBadge, stockBadge, errorMessage };
 })();
 
 // Escape key closes whichever modal is currently open, on any page.

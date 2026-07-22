@@ -11,7 +11,8 @@
    =========================================================== */
 
 const API_BASE = '/api/v1';   // future real backend base URL
-const USE_MOCK = false;
+const USE_MOCK = true;
+const MOCK_ONLY_PATHS = ['/admissions', '/lab-orders', '/lab-test-catalog', '/drugs', '/drug-stock', '/prescriptions', '/referrals', '/sick-leaves', '/users', '/roles', '/settings', '/backups'];
 const MOCK_DELAY = 320;       // ms, simulates network latency
 const DB_KEY = 'tppf_mock_db_v1';
 
@@ -56,6 +57,7 @@ function buildSeed() {
     { id: 'vis_6', patient_id: 'pat_1', physician_id: 'phy_3', visit_date: iso(4, 9, 0), status: 'closed', chief_complaint: 'Recurrent cough', examination_notes: 'Chest clear on auscultation.', diagnosis: 'Upper respiratory tract infection', disposition: 'discharged' },
     { id: 'vis_7', patient_id: 'pat_3', physician_id: 'phy_1', visit_date: iso(5, 13, 15), status: 'closed', chief_complaint: 'Ankle sprain', examination_notes: 'Mild swelling, full weight bearing possible.', diagnosis: 'Grade 1 ankle sprain', disposition: 'referred' },
     { id: 'vis_8', patient_id: 'pat_4', physician_id: 'phy_2', visit_date: iso(6, 10, 40), status: 'closed', chief_complaint: 'Skin rash', examination_notes: 'Localized rash on forearm, no systemic symptoms.', diagnosis: 'Contact dermatitis', disposition: 'discharged' },
+    { id: 'vis_9', patient_id: 'pat_6', physician_id: 'phy_3', visit_date: iso(0, 8, 0), status: 'diagnosed', chief_complaint: 'Severe abdominal pain and dehydration', examination_notes: 'Guarding on palpation, unable to tolerate oral fluids.', diagnosis: 'Suspected acute gastroenteritis with dehydration', disposition: 'admitted' },
   ];
 
   const registrations = [
@@ -87,15 +89,109 @@ function buildSeed() {
     },
   ];
 
+  const lab_test_catalog = [
+    { id: 'test_wbc', code: 'WBC', panel: 'Hematology', display_name: 'White Blood Cell Count' },
+    { id: 'test_hgb', code: 'HGB', panel: 'Hematology', display_name: 'Hemoglobin' },
+    { id: 'test_plt', code: 'PLT', panel: 'Hematology', display_name: 'Platelet Count' },
+    { id: 'test_rbs', code: 'RBS', panel: 'Chemistry', display_name: 'Random Blood Sugar' },
+    { id: 'test_fbs', code: 'FBS', panel: 'Chemistry', display_name: 'Fasting Blood Sugar' },
+    { id: 'test_crea', code: 'CREA', panel: 'Chemistry', display_name: 'Creatinine' },
+    { id: 'test_hbsag', code: 'HBSAG', panel: 'Serology', display_name: 'Hepatitis B Surface Antigen' },
+    { id: 'test_vdrl', code: 'VDRL', panel: 'Serology', display_name: 'Syphilis Screening (VDRL)' },
+    { id: 'test_hiv', code: 'HIV', panel: 'Serology', display_name: 'HIV Antibody Test' },
+    { id: 'test_urine', code: 'URINE', panel: 'Urinalysis', display_name: 'Routine Urinalysis' },
+    { id: 'test_stool', code: 'STOOL', panel: 'Stool/Parasitology', display_name: 'Stool Examination, Direct' },
+  ];
+
+  const drugs = [
+    { id: 'drug_paracetamol', name: 'Paracetamol 500mg', unit: 'tablet', description: 'Analgesic / antipyretic' },
+    { id: 'drug_amoxicillin', name: 'Amoxicillin 500mg', unit: 'capsule', description: 'Antibiotic' },
+    { id: 'drug_ibuprofen', name: 'Ibuprofen 400mg', unit: 'tablet', description: 'NSAID' },
+    { id: 'drug_ors', name: 'Oral Rehydration Salts', unit: 'sachet', description: 'Rehydration therapy' },
+    { id: 'drug_metronidazole', name: 'Metronidazole 400mg', unit: 'tablet', description: 'Antibiotic / antiparasitic' },
+    { id: 'drug_diclofenac_gel', name: 'Diclofenac Gel', unit: 'tube', description: 'Topical NSAID' },
+    { id: 'drug_ciprofloxacin', name: 'Ciprofloxacin 500mg', unit: 'tablet', description: 'Antibiotic' },
+    { id: 'drug_vitc', name: 'Vitamin C 500mg', unit: 'tablet', description: 'Supplement' },
+  ];
+
+  const drug_stock = [
+    { drug_id: 'drug_paracetamol', quantity_on_hand: 420, reorder_threshold: 100 },
+    { drug_id: 'drug_amoxicillin', quantity_on_hand: 38, reorder_threshold: 50 },
+    { drug_id: 'drug_ibuprofen', quantity_on_hand: 180, reorder_threshold: 60 },
+    { drug_id: 'drug_ors', quantity_on_hand: 90, reorder_threshold: 30 },
+    { drug_id: 'drug_metronidazole', quantity_on_hand: 12, reorder_threshold: 40 },
+    { drug_id: 'drug_diclofenac_gel', quantity_on_hand: 25, reorder_threshold: 10 },
+    { drug_id: 'drug_ciprofloxacin', quantity_on_hand: 64, reorder_threshold: 40 },
+    { drug_id: 'drug_vitc', quantity_on_hand: 300, reorder_threshold: 50 },
+  ];
+
+  const roles = [
+    { id: 'role_receptionist', name: 'receptionist', display_name: 'Receptionist' },
+    { id: 'role_physician', name: 'physician', display_name: 'Physician' },
+    { id: 'role_lab_technician', name: 'lab_technician', display_name: 'Lab Technician' },
+    { id: 'role_pharmacist', name: 'pharmacist', display_name: 'Pharmacist' },
+    { id: 'role_hr_admin', name: 'hr_admin', display_name: 'HR/Admin' },
+    { id: 'role_system_administrator', name: 'system_administrator', display_name: 'System Administrator' },
+  ];
+
+  const users = [
+    { id: 'usr_1', username: 'admin', password: 'admin123', full_name: 'System Administrator', physician_id: null, is_active: true, role_ids: ['role_system_administrator'], last_login_at: null, created_at: nowIso() },
+    { id: 'usr_2', username: 'selam.girma', password: 'clinic123', full_name: 'Dr. Selamawit Girma', physician_id: 'phy_1', is_active: true, role_ids: ['role_physician'], last_login_at: null, created_at: nowIso() },
+    { id: 'usr_3', username: 'reception1', password: 'clinic123', full_name: 'Bethlehem Assefa', physician_id: null, is_active: true, role_ids: ['role_receptionist'], last_login_at: null, created_at: nowIso() },
+    { id: 'usr_4', username: 'labtech1', password: 'clinic123', full_name: 'Yared Mulugeta', physician_id: null, is_active: true, role_ids: ['role_lab_technician'], last_login_at: null, created_at: nowIso() },
+    { id: 'usr_5', username: 'pharm1', password: 'clinic123', full_name: 'Meron Tsegaye', physician_id: null, is_active: false, role_ids: ['role_pharmacist'], last_login_at: null, created_at: nowIso() },
+    { id: 'usr_6', username: 'pharm2', password: 'clinic123', full_name: 'Selamawit Bekele', physician_id: null, is_active: true, role_ids: ['role_pharmacist'], last_login_at: null, created_at: nowIso() },
+  ];
+
+  const labOrders = [
+    { id: 'lord_1', visit_id: 'vis_1', patient_name: 'Abebe Kassahun', patient_code: 'S001', physician_id: 'phy_1', order_date: iso(0, 9, 30), status: 'pending' },
+    { id: 'lord_2', visit_id: 'vis_2', patient_name: 'Yonas Tadesse', patient_code: 'S003', physician_id: 'phy_2', order_date: iso(0, 10, 15), status: 'completed' },
+  ];
+  const labOrderItems = [
+    { id: 'litem_1', lab_order_id: 'lord_1', test_id: 'test_wbc', result_value: null, entered_by: null, entered_at: null },
+    { id: 'litem_2', lab_order_id: 'lord_1', test_id: 'test_rbs', result_value: null, entered_by: null, entered_at: null },
+    { id: 'litem_3', lab_order_id: 'lord_2', test_id: 'test_crea', result_value: '0.9 mg/dL', entered_by: 'usr_4', entered_at: iso(0, 11, 0) },
+  ];
+
+  const rxSeed = [
+    { id: 'rx_1', visit_id: 'vis_1', patient_name: 'Abebe Kassahun', patient_code: 'S001', physician_id: 'phy_1', diagnosis_note: '', prescribed_date: iso(0, 9, 20) },
+    { id: 'rx_2', visit_id: 'vis_3', patient_name: 'Sara Mekonnen', patient_code: 'S004', physician_id: 'phy_3', diagnosis_note: 'Acute pharyngitis', prescribed_date: iso(1, 14, 20) },
+  ];
+  const rxItems = [
+    { id: 'rxi_1', prescription_id: 'rx_1', drug_id: 'drug_paracetamol', dosage: '500mg', frequency: '3x/day', duration: '3 days', quantity_prescribed: 9, instructions: 'Take with food' },
+    { id: 'rxi_2', prescription_id: 'rx_2', drug_id: 'drug_amoxicillin', dosage: '500mg', frequency: '2x/day', duration: '7 days', quantity_prescribed: 14, instructions: '' },
+  ];
+  const dispensingSeed = [
+    { id: 'disp_1', prescription_item_id: 'rxi_2', quantity_dispensed: 6, dispensed_by: 'usr_5', dispensed_at: iso(1, 15, 0) },
+  ];
+
   return {
-    users: [
-      { id: 'usr_1', username: 'admin', password: 'admin123', full_name: 'System Administrator', physician_id: null, is_active: true, roles: ['System Administrator'], last_login_at: null },
-    ],
+    users,
     physicians,
     patients,
     visits,
     registrations,
     certifications,
+    admissions: [],
+    admission_notes: [],
+    lab_test_catalog,
+    lab_orders: labOrders,
+    lab_order_items: labOrderItems,
+    drugs,
+    drug_stock,
+    prescriptions: rxSeed,
+    prescription_items: rxItems,
+    dispensing_records: dispensingSeed,
+    referrals: [],
+    sick_leaves: [],
+    roles,
+    settings: {
+      clinic_name: 'TPPF Clinic',
+      clinic_tagline: 'Occupational & Community Health Services',
+      clinic_address: '',
+      clinic_phone: '',
+    },
+    backups: [],
     meta: { patient_seq: 6, registration_seq: 5, seeded_at: nowIso() },
   };
 }
@@ -105,6 +201,30 @@ function buildSeed() {
 function migrateDb(db) {
   if (!db.registrations) db.registrations = [];
   if (!db.certifications) db.certifications = [];
+  if (!db.admissions) db.admissions = [];
+  if (!db.admission_notes) db.admission_notes = [];
+  if (!db.lab_orders) db.lab_orders = [];
+  if (!db.lab_order_items) db.lab_order_items = [];
+  if (!db.lab_test_catalog || !db.lab_test_catalog.length) db.lab_test_catalog = buildSeed().lab_test_catalog;
+  if (!db.drugs || !db.drugs.length) db.drugs = buildSeed().drugs;
+  if (!db.drug_stock || !db.drug_stock.length) db.drug_stock = buildSeed().drug_stock;
+  if (!db.prescriptions) db.prescriptions = [];
+  if (!db.prescription_items) db.prescription_items = [];
+  if (!db.dispensing_records) db.dispensing_records = [];
+  if (!db.referrals) db.referrals = [];
+  if (!db.sick_leaves) db.sick_leaves = [];
+  if (!db.roles || !db.roles.length) db.roles = buildSeed().roles;
+  if (!db.settings) db.settings = buildSeed().settings;
+  if (!db.backups) db.backups = [];
+  if (db.users && db.users.some(u => u.roles && !u.role_ids)) {
+    const nameToId = Object.fromEntries(db.roles.map(r => [r.display_name, r.id]));
+    db.users.forEach(u => {
+      if (u.roles && !u.role_ids) {
+        u.role_ids = u.roles.map(r => nameToId[r]).filter(Boolean);
+        delete u.roles;
+      }
+    });
+  }
   if (!db.meta) db.meta = {};
   if (db.meta.registration_seq === undefined) db.meta.registration_seq = db.registrations.length;
   return db;
@@ -164,9 +284,13 @@ async function mockRequest(method, path, body) {
     }
     user.last_login_at = nowIso();
     saveDb(db);
+    const roleDisplayNames = (user.role_ids || []).map(rid => {
+      const role = db.roles.find(r => r.id === rid);
+      return role ? role.display_name : null;
+    }).filter(Boolean);
     return {
       token: uid('tok'),
-      user: { id: user.id, username: user.username, full_name: user.full_name, roles: user.roles },
+      user: { id: user.id, username: user.username, full_name: user.full_name, roles: roleDisplayNames },
     };
   }
 
@@ -479,6 +603,486 @@ async function mockRequest(method, path, body) {
     }
   }
 
+  // /lab-test-catalog
+  if (seg[0] === 'lab-test-catalog' && method === 'GET') {
+    return db.lab_test_catalog;
+  }
+
+  // /admissions
+  if (seg[0] === 'admissions') {
+    if (method === 'GET' && seg.length === 1) {
+      let list = [...db.admissions];
+      if (qs.visit_id) list = list.filter(a => String(a.visit_id) === String(qs.visit_id));
+      if (qs.status && qs.status !== 'all') list = list.filter(a => a.status === qs.status);
+      if (qs.search) {
+        const s = qs.search.toLowerCase();
+        list = list.filter(a => (a.patient_name || '').toLowerCase().includes(s) || (a.patient_code || '').toLowerCase().includes(s));
+      }
+      list.sort((a, b) => new Date(b.admitted_at) - new Date(a.admitted_at));
+      return list;
+    }
+    if (method === 'GET' && seg.length === 2) {
+      const a = db.admissions.find(x => x.id === seg[1]);
+      if (!a) { const err = new Error('Admission not found.'); err.status = 404; throw err; }
+      const notes = db.admission_notes
+        .filter(n => n.admission_id === a.id)
+        .sort((x, y) => new Date(y.recorded_at) - new Date(x.recorded_at));
+      return { ...a, notes };
+    }
+    if (method === 'POST' && seg.length === 1) {
+      if (!body.visit_id || !body.patient_id) { const err = new Error('A visit and patient are required.'); err.status = 422; throw err; }
+      const existing = db.admissions.find(x => String(x.visit_id) === String(body.visit_id));
+      if (existing) { const err = new Error('An admission record already exists for this visit.'); err.status = 422; throw err; }
+      const admission = {
+        id: uid('adm'),
+        visit_id: body.visit_id,
+        patient_id: body.patient_id,
+        patient_name: body.patient_name || '',
+        patient_code: body.patient_code || '',
+        admitting_physician_id: body.admitting_physician_id || null,
+        admitted_at: nowIso(),
+        reason: body.reason || '',
+        status: 'admitted',
+        discharged_at: null,
+        discharge_notes: null,
+      };
+      db.admissions.unshift(admission);
+      saveDb(db);
+      return admission;
+    }
+    if (method === 'POST' && seg.length === 3 && seg[2] === 'notes') {
+      const a = db.admissions.find(x => x.id === seg[1]);
+      if (!a) { const err = new Error('Admission not found.'); err.status = 404; throw err; }
+      if (!body.note || !body.note.trim()) { const err = new Error('Note text is required.'); err.status = 422; throw err; }
+      const note = { id: uid('admn'), admission_id: a.id, note: body.note.trim(), recorded_by: body.recorded_by || null, recorded_at: nowIso() };
+      db.admission_notes.unshift(note);
+      saveDb(db);
+      return note;
+    }
+    if (method === 'POST' && seg.length === 3 && seg[2] === 'discharge') {
+      const a = db.admissions.find(x => x.id === seg[1]);
+      if (!a) { const err = new Error('Admission not found.'); err.status = 404; throw err; }
+      if (a.status === 'discharged') { const err = new Error('This admission has already been discharged.'); err.status = 422; throw err; }
+      a.status = 'discharged';
+      a.discharged_at = nowIso();
+      a.discharge_notes = body.discharge_notes || '';
+      saveDb(db);
+      return a;
+    }
+  }
+
+  // /lab-orders
+  if (seg[0] === 'lab-orders') {
+    if (method === 'GET' && seg.length === 1) {
+      let list = db.lab_orders.map(o => ({
+        ...o,
+        items: db.lab_order_items.filter(i => i.lab_order_id === o.id).map(i => ({
+          ...i,
+          test: db.lab_test_catalog.find(t => t.id === i.test_id) || null,
+        })),
+      }));
+      if (qs.visit_id) list = list.filter(o => String(o.visit_id) === String(qs.visit_id));
+      if (qs.status && qs.status !== 'all') list = list.filter(o => o.status === qs.status);
+      if (qs.search) {
+        const s = qs.search.toLowerCase();
+        list = list.filter(o => (o.patient_name || '').toLowerCase().includes(s) || (o.patient_code || '').toLowerCase().includes(s));
+      }
+      list.sort((a, b) => new Date(b.order_date) - new Date(a.order_date));
+      return list;
+    }
+    if (method === 'GET' && seg.length === 2) {
+      const o = db.lab_orders.find(x => x.id === seg[1]);
+      if (!o) { const err = new Error('Lab order not found.'); err.status = 404; throw err; }
+      const items = db.lab_order_items.filter(i => i.lab_order_id === o.id).map(i => ({
+        ...i,
+        test: db.lab_test_catalog.find(t => t.id === i.test_id) || null,
+      }));
+      return { ...o, items };
+    }
+    if (method === 'POST' && seg.length === 1) {
+      if (!body.visit_id) { const err = new Error('A visit is required.'); err.status = 422; throw err; }
+      if (!Array.isArray(body.test_ids) || !body.test_ids.length) { const err = new Error('Select at least one test.'); err.status = 422; throw err; }
+      const order = {
+        id: uid('lord'),
+        visit_id: body.visit_id,
+        patient_name: body.patient_name || '',
+        patient_code: body.patient_code || '',
+        physician_id: body.physician_id || null,
+        order_date: nowIso(),
+        status: 'pending',
+      };
+      db.lab_orders.unshift(order);
+      body.test_ids.forEach(testId => {
+        db.lab_order_items.push({ id: uid('litem'), lab_order_id: order.id, test_id: testId, result_value: null, entered_by: null, entered_at: null });
+      });
+      saveDb(db);
+      return order;
+    }
+    if (method === 'PUT' && seg.length === 2) {
+      const o = db.lab_orders.find(x => x.id === seg[1]);
+      if (!o) { const err = new Error('Lab order not found.'); err.status = 404; throw err; }
+      if (body.status && body.status !== o.status) {
+        const allowed = { pending: ['in_progress'], in_progress: ['completed'], completed: [] };
+        if (!(allowed[o.status] || []).includes(body.status)) {
+          const err = new Error(`Cannot move a lab order from "${o.status}" to "${body.status}" directly.`);
+          err.status = 422;
+          throw err;
+        }
+        if (body.status === 'completed') {
+          const items = db.lab_order_items.filter(i => i.lab_order_id === o.id);
+          if (items.some(i => !i.result_value)) {
+            const err = new Error('Enter a result for every test before marking this order completed.');
+            err.status = 422;
+            throw err;
+          }
+        }
+        o.status = body.status;
+      }
+      saveDb(db);
+      return o;
+    }
+    if (method === 'PUT' && seg.length === 4 && seg[2] === 'items') {
+      const item = db.lab_order_items.find(x => x.id === seg[3]);
+      if (!item) { const err = new Error('Lab order item not found.'); err.status = 404; throw err; }
+      item.result_value = body.result_value || null;
+      item.entered_by = body.entered_by || null;
+      item.entered_at = item.result_value ? nowIso() : null;
+      saveDb(db);
+      return item;
+    }
+  }
+
+  function embedItemsForPrescription(rx) {
+    const items = db.prescription_items.filter(i => i.prescription_id === rx.id).map(i => {
+      const drug = db.drugs.find(d => d.id === i.drug_id) || null;
+      const dispensedTotal = db.dispensing_records
+        .filter(d => d.prescription_item_id === i.id)
+        .reduce((sum, d) => sum + d.quantity_dispensed, 0);
+      const records = db.dispensing_records
+        .filter(d => d.prescription_item_id === i.id)
+        .sort((a, b) => new Date(b.dispensed_at) - new Date(a.dispensed_at));
+      return {
+        ...i,
+        drug,
+        dispensed_total: dispensedTotal,
+        remaining: i.quantity_prescribed - dispensedTotal,
+        dispensing_records: records,
+      };
+    });
+    const status = items.every(i => i.remaining <= 0) ? 'fulfilled' : 'active';
+    return { ...rx, items, status };
+  }
+
+  // /drugs
+  if (seg[0] === 'drugs') {
+    if (method === 'GET' && seg.length === 1) {
+      return db.drugs.map(d => ({ ...d, stock: db.drug_stock.find(s => s.drug_id === d.id) || { quantity_on_hand: 0, reorder_threshold: 0 } }));
+    }
+    if (method === 'POST' && seg.length === 1) {
+      if (!body.name || !body.name.trim()) { const err = new Error('Drug name is required.'); err.status = 422; throw err; }
+      const drug = { id: uid('drug'), name: body.name.trim(), unit: body.unit || '', description: body.description || '' };
+      db.drugs.push(drug);
+      db.drug_stock.push({ drug_id: drug.id, quantity_on_hand: Number(body.initial_quantity) || 0, reorder_threshold: Number(body.reorder_threshold) || 0 });
+      saveDb(db);
+      return { ...drug, stock: db.drug_stock.find(s => s.drug_id === drug.id) };
+    }
+  }
+
+  // /drug-stock/:drugId  (restock adjustment)
+  if (seg[0] === 'drug-stock' && method === 'PUT' && seg.length === 2) {
+    const stock = db.drug_stock.find(s => s.drug_id === seg[1]);
+    if (!stock) { const err = new Error('Stock record not found.'); err.status = 404; throw err; }
+    const delta = Number(body.delta) || 0;
+    if (stock.quantity_on_hand + delta < 0) {
+      const err = new Error('Stock cannot go below zero.');
+      err.status = 422;
+      throw err;
+    }
+    stock.quantity_on_hand += delta;
+    saveDb(db);
+    return stock;
+  }
+
+  // /prescriptions
+  if (seg[0] === 'prescriptions') {
+    if (method === 'GET' && seg.length === 1) {
+      let list = db.prescriptions.map(embedItemsForPrescription);
+      if (qs.visit_id) list = list.filter(rx => String(rx.visit_id) === String(qs.visit_id));
+      if (qs.status && qs.status !== 'all') list = list.filter(rx => rx.status === qs.status);
+      if (qs.search) {
+        const s = qs.search.toLowerCase();
+        list = list.filter(rx => (rx.patient_name || '').toLowerCase().includes(s) || (rx.patient_code || '').toLowerCase().includes(s));
+      }
+      list.sort((a, b) => new Date(b.prescribed_date) - new Date(a.prescribed_date));
+      return list;
+    }
+    if (method === 'GET' && seg.length === 2) {
+      const rx = db.prescriptions.find(x => x.id === seg[1]);
+      if (!rx) { const err = new Error('Prescription not found.'); err.status = 404; throw err; }
+      return embedItemsForPrescription(rx);
+    }
+    if (method === 'POST' && seg.length === 1) {
+      if (!body.visit_id) { const err = new Error('A visit is required.'); err.status = 422; throw err; }
+      if (!Array.isArray(body.items) || !body.items.length) { const err = new Error('Add at least one drug.'); err.status = 422; throw err; }
+      const rx = {
+        id: uid('rx'),
+        visit_id: body.visit_id,
+        patient_name: body.patient_name || '',
+        patient_code: body.patient_code || '',
+        physician_id: body.physician_id || null,
+        diagnosis_note: body.diagnosis_note || '',
+        prescribed_date: nowIso(),
+      };
+      db.prescriptions.unshift(rx);
+      body.items.forEach(it => {
+        if (!it.drug_id || !it.quantity_prescribed) return;
+        db.prescription_items.push({
+          id: uid('rxi'),
+          prescription_id: rx.id,
+          drug_id: it.drug_id,
+          dosage: it.dosage || '',
+          frequency: it.frequency || '',
+          duration: it.duration || '',
+          quantity_prescribed: Number(it.quantity_prescribed),
+          instructions: it.instructions || '',
+        });
+      });
+      saveDb(db);
+      return embedItemsForPrescription(rx);
+    }
+    if (method === 'POST' && seg.length === 3 && seg[2] === 'dispense') {
+      const rx = db.prescriptions.find(x => x.id === seg[1]);
+      if (!rx) { const err = new Error('Prescription not found.'); err.status = 404; throw err; }
+      const item = db.prescription_items.find(i => i.id === body.item_id && i.prescription_id === rx.id);
+      if (!item) { const err = new Error('Prescription item not found.'); err.status = 404; throw err; }
+
+      const qty = Number(body.quantity);
+      if (!qty || qty <= 0) { const err = new Error('Enter a quantity to dispense.'); err.status = 422; throw err; }
+
+      const alreadyDispensed = db.dispensing_records
+        .filter(d => d.prescription_item_id === item.id)
+        .reduce((sum, d) => sum + d.quantity_dispensed, 0);
+      const remaining = item.quantity_prescribed - alreadyDispensed;
+      if (qty > remaining) {
+        const err = new Error(`Cannot dispense more than the ${remaining} unit(s) remaining on this item.`);
+        err.status = 422;
+        throw err;
+      }
+
+      const stock = db.drug_stock.find(s => s.drug_id === item.drug_id);
+      if (!stock || stock.quantity_on_hand < qty) {
+        const err = new Error('Not enough stock on hand to dispense this quantity.');
+        err.status = 422;
+        throw err;
+      }
+
+      stock.quantity_on_hand -= qty;
+      const record = {
+        id: uid('disp'),
+        prescription_item_id: item.id,
+        quantity_dispensed: qty,
+        dispensed_by: body.dispensed_by || null,
+        dispensed_at: nowIso(),
+      };
+      db.dispensing_records.unshift(record);
+      saveDb(db);
+      return embedItemsForPrescription(rx);
+    }
+  }
+
+  // /referrals
+  if (seg[0] === 'referrals') {
+    if (method === 'GET' && seg.length === 1) {
+      let list = [...db.referrals];
+      if (qs.visit_id) list = list.filter(r => String(r.visit_id) === String(qs.visit_id));
+      if (qs.search) {
+        const s = qs.search.toLowerCase();
+        list = list.filter(r => (r.patient_name || '').toLowerCase().includes(s) || (r.patient_code || '').toLowerCase().includes(s));
+      }
+      list.sort((a, b) => new Date(b.referral_date) - new Date(a.referral_date));
+      return list;
+    }
+    if (method === 'GET' && seg.length === 2) {
+      const r = db.referrals.find(x => x.id === seg[1]);
+      if (!r) { const err = new Error('Referral not found.'); err.status = 404; throw err; }
+      return r;
+    }
+    if (method === 'POST' && seg.length === 1) {
+      if (!body.visit_id) { const err = new Error('A visit is required.'); err.status = 422; throw err; }
+      if (!body.referred_to || !body.referred_to.trim()) { const err = new Error('Enter where the patient is being referred to.'); err.status = 422; throw err; }
+      const referral = {
+        id: uid('ref'),
+        visit_id: body.visit_id,
+        patient_name: body.patient_name || '',
+        patient_code: body.patient_code || '',
+        physician_id: body.physician_id || null,
+        diagnosis: body.diagnosis || '',
+        referral_date: nowIso(),
+        reason: body.reason || '',
+        referred_to: body.referred_to.trim(),
+        note: body.note || '',
+      };
+      db.referrals.unshift(referral);
+      saveDb(db);
+      return referral;
+    }
+  }
+
+  // /sick-leaves
+  if (seg[0] === 'sick-leaves') {
+    if (method === 'GET' && seg.length === 1) {
+      let list = [...db.sick_leaves];
+      if (qs.visit_id) list = list.filter(s => String(s.visit_id) === String(qs.visit_id));
+      if (qs.search) {
+        const s = qs.search.toLowerCase();
+        list = list.filter(sl => (sl.patient_name || '').toLowerCase().includes(s) || (sl.patient_code || '').toLowerCase().includes(s));
+      }
+      list.sort((a, b) => new Date(b.leave_start) - new Date(a.leave_start));
+      return list;
+    }
+    if (method === 'GET' && seg.length === 2) {
+      const s = db.sick_leaves.find(x => x.id === seg[1]);
+      if (!s) { const err = new Error('Sick leave not found.'); err.status = 404; throw err; }
+      return s;
+    }
+    if (method === 'POST' && seg.length === 1) {
+      if (!body.visit_id) { const err = new Error('A visit is required.'); err.status = 422; throw err; }
+      if (!body.leave_start || !body.leave_end) { const err = new Error('Enter both a start and end date.'); err.status = 422; throw err; }
+      if (new Date(body.leave_end) < new Date(body.leave_start)) {
+        const err = new Error('The end date cannot be before the start date.');
+        err.status = 422;
+        throw err;
+      }
+      const sickLeave = {
+        id: uid('sl'),
+        visit_id: body.visit_id,
+        patient_name: body.patient_name || '',
+        patient_code: body.patient_code || '',
+        physician_id: body.physician_id || null,
+        diagnosis: body.diagnosis || '',
+        exam_date: body.exam_date || nowIso(),
+        leave_start: body.leave_start,
+        leave_end: body.leave_end,
+      };
+      db.sick_leaves.unshift(sickLeave);
+      saveDb(db);
+      return sickLeave;
+    }
+  }
+
+  // /roles
+  if (seg[0] === 'roles' && method === 'GET') {
+    return db.roles;
+  }
+
+  // /users
+  if (seg[0] === 'users') {
+    if (method === 'GET' && seg.length === 1) {
+      let list = db.users.map(u => ({
+        ...u,
+        password: undefined,
+        roles: (u.role_ids || []).map(rid => db.roles.find(r => r.id === rid)).filter(Boolean),
+      }));
+      if (qs.search) {
+        const s = qs.search.toLowerCase();
+        list = list.filter(u => u.username.toLowerCase().includes(s) || (u.full_name || '').toLowerCase().includes(s));
+      }
+      if (qs.status === 'active') list = list.filter(u => u.is_active);
+      if (qs.status === 'inactive') list = list.filter(u => !u.is_active);
+      list.sort((a, b) => a.username.localeCompare(b.username));
+      return list;
+    }
+    if (method === 'POST' && seg.length === 1) {
+      if (!body.username || !body.username.trim()) { const err = new Error('Username is required.'); err.status = 422; throw err; }
+      if (db.users.some(u => u.username === body.username.trim())) { const err = new Error('That username is already taken.'); err.status = 422; throw err; }
+      if (!body.password || body.password.length < 6) { const err = new Error('Password must be at least 6 characters.'); err.status = 422; throw err; }
+      if (!Array.isArray(body.role_ids) || !body.role_ids.length) { const err = new Error('Assign at least one role.'); err.status = 422; throw err; }
+      const user = {
+        id: uid('usr'),
+        username: body.username.trim(),
+        password: body.password,
+        full_name: body.full_name || '',
+        physician_id: body.physician_id || null,
+        is_active: true,
+        role_ids: body.role_ids,
+        last_login_at: null,
+        created_at: nowIso(),
+      };
+      db.users.push(user);
+      saveDb(db);
+      return { ...user, password: undefined, roles: user.role_ids.map(rid => db.roles.find(r => r.id === rid)).filter(Boolean) };
+    }
+    if (method === 'PUT' && seg.length === 2) {
+      const user = db.users.find(u => u.id === seg[1]);
+      if (!user) { const err = new Error('User not found.'); err.status = 404; throw err; }
+      if (body.full_name !== undefined) user.full_name = body.full_name;
+      if (body.physician_id !== undefined) user.physician_id = body.physician_id || null;
+      if (body.role_ids !== undefined) {
+        if (!Array.isArray(body.role_ids) || !body.role_ids.length) { const err = new Error('Assign at least one role.'); err.status = 422; throw err; }
+        user.role_ids = body.role_ids;
+      }
+      if (body.is_active !== undefined) {
+        if (user.username === 'admin' && !body.is_active) { const err = new Error('The built-in admin account cannot be deactivated.'); err.status = 422; throw err; }
+        user.is_active = body.is_active;
+      }
+      saveDb(db);
+      return { ...user, password: undefined, roles: user.role_ids.map(rid => db.roles.find(r => r.id === rid)).filter(Boolean) };
+    }
+    if (method === 'POST' && seg.length === 3 && seg[2] === 'reset-password') {
+      const user = db.users.find(u => u.id === seg[1]);
+      if (!user) { const err = new Error('User not found.'); err.status = 404; throw err; }
+      if (!body.password || body.password.length < 6) { const err = new Error('Password must be at least 6 characters.'); err.status = 422; throw err; }
+      user.password = body.password;
+      saveDb(db);
+      return { ok: true };
+    }
+    if (method === 'POST' && seg.length === 3 && seg[2] === 'change-password') {
+      const user = db.users.find(u => u.id === seg[1]);
+      if (!user) { const err = new Error('User not found.'); err.status = 404; throw err; }
+      if (user.password !== body.current_password) { const err = new Error('Current password is incorrect.'); err.status = 401; throw err; }
+      if (!body.new_password || body.new_password.length < 6) { const err = new Error('New password must be at least 6 characters.'); err.status = 422; throw err; }
+      user.password = body.new_password;
+      saveDb(db);
+      return { ok: true };
+    }
+  }
+
+  // /settings
+  if (seg[0] === 'settings') {
+    if (method === 'GET') return db.settings;
+    if (method === 'PUT') {
+      db.settings = { ...db.settings, ...body };
+      saveDb(db);
+      return db.settings;
+    }
+  }
+
+  // /backups
+  if (seg[0] === 'backups') {
+    if (method === 'GET') {
+      return [...db.backups].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
+    if (method === 'POST') {
+      const backup = {
+        id: uid('bkp'),
+        label: body.label || `Manual backup`,
+        size_bytes: Math.floor(400000 + Math.random() * 2200000),
+        created_at: nowIso(),
+        created_by: body.created_by || null,
+      };
+      db.backups.unshift(backup);
+      saveDb(db);
+      return backup;
+    }
+    if (method === 'DELETE' && seg.length === 2) {
+      const idx = db.backups.findIndex(b => b.id === seg[1]);
+      if (idx === -1) { const err = new Error('Backup not found.'); err.status = 404; throw err; }
+      db.backups.splice(idx, 1);
+      saveDb(db);
+      return { ok: true };
+    }
+  }
+
   const err = new Error(`No mock handler for ${method} ${path}`);
   err.status = 404;
   throw err;
@@ -486,7 +1090,8 @@ async function mockRequest(method, path, body) {
 
 // ---------- public API surface ----------
 async function apiRequest(method, path, body) {
-  if (USE_MOCK) {
+  const forceMock = MOCK_ONLY_PATHS.some(p => path.split('?')[0].startsWith(p));
+  if (USE_MOCK || forceMock) {
     return mockRequest(method, path, body);
   }
   const session = Auth.getSession();
@@ -536,5 +1141,62 @@ const Api = {
     list: (params = {}) => apiRequest('GET', `/certifications?${new URLSearchParams(params)}`),
     get: (id) => apiRequest('GET', `/certifications/${id}`),
     create: (data) => apiRequest('POST', '/certifications', data),
+  },
+  admissions: {
+    list: (params = {}) => apiRequest('GET', `/admissions?${new URLSearchParams(params)}`),
+    get: (id) => apiRequest('GET', `/admissions/${id}`),
+    create: (data) => apiRequest('POST', '/admissions', data),
+    addNote: (id, note) => apiRequest('POST', `/admissions/${id}/notes`, { note }),
+    discharge: (id, discharge_notes) => apiRequest('POST', `/admissions/${id}/discharge`, { discharge_notes }),
+  },
+  labCatalog: {
+    list: () => apiRequest('GET', '/lab-test-catalog'),
+  },
+  labOrders: {
+    list: (params = {}) => apiRequest('GET', `/lab-orders?${new URLSearchParams(params)}`),
+    get: (id) => apiRequest('GET', `/lab-orders/${id}`),
+    create: (data) => apiRequest('POST', '/lab-orders', data),
+    updateStatus: (id, status) => apiRequest('PUT', `/lab-orders/${id}`, { status }),
+    updateItem: (orderId, itemId, result_value) => apiRequest('PUT', `/lab-orders/${orderId}/items/${itemId}`, { result_value }),
+  },
+  drugs: {
+    list: () => apiRequest('GET', '/drugs'),
+    create: (data) => apiRequest('POST', '/drugs', data),
+    adjustStock: (drugId, delta) => apiRequest('PUT', `/drug-stock/${drugId}`, { delta }),
+  },
+  prescriptions: {
+    list: (params = {}) => apiRequest('GET', `/prescriptions?${new URLSearchParams(params)}`),
+    get: (id) => apiRequest('GET', `/prescriptions/${id}`),
+    create: (data) => apiRequest('POST', '/prescriptions', data),
+    dispense: (id, item_id, quantity) => apiRequest('POST', `/prescriptions/${id}/dispense`, { item_id, quantity }),
+  },
+  referrals: {
+    list: (params = {}) => apiRequest('GET', `/referrals?${new URLSearchParams(params)}`),
+    get: (id) => apiRequest('GET', `/referrals/${id}`),
+    create: (data) => apiRequest('POST', '/referrals', data),
+  },
+  sickLeaves: {
+    list: (params = {}) => apiRequest('GET', `/sick-leaves?${new URLSearchParams(params)}`),
+    get: (id) => apiRequest('GET', `/sick-leaves/${id}`),
+    create: (data) => apiRequest('POST', '/sick-leaves', data),
+  },
+  roles: {
+    list: () => apiRequest('GET', '/roles'),
+  },
+  users: {
+    list: (params = {}) => apiRequest('GET', `/users?${new URLSearchParams(params)}`),
+    create: (data) => apiRequest('POST', '/users', data),
+    update: (id, data) => apiRequest('PUT', `/users/${id}`, data),
+    resetPassword: (id, password) => apiRequest('POST', `/users/${id}/reset-password`, { password }),
+    changePassword: (id, current_password, new_password) => apiRequest('POST', `/users/${id}/change-password`, { current_password, new_password }),
+  },
+  settings: {
+    get: () => apiRequest('GET', '/settings'),
+    update: (data) => apiRequest('PUT', '/settings', data),
+  },
+  backups: {
+    list: () => apiRequest('GET', '/backups'),
+    create: (label) => apiRequest('POST', '/backups', { label }),
+    remove: (id) => apiRequest('DELETE', `/backups/${id}`),
   },
 };
