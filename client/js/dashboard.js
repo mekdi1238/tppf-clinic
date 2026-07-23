@@ -206,11 +206,104 @@ async function renderPharmacistDashboard() {
   `;
 }
 
+async function renderReceptionistDashboard() {
+  const [patients, visits, registrations] = await Promise.all([
+    Api.patients.list(),
+    Api.visits.list(),
+    Api.registrations.list({ status: 'all' }),
+  ]);
+  const todayStr = new Date().toDateString();
+  const patientsToday = patients.filter(p => new Date(p.registered_date).toDateString() === todayStr).length;
+  const visitsToday = visits.filter(v => new Date(v.visit_date).toDateString() === todayStr).length;
+  const registrationsToday = registrations.filter(r => new Date(r.registration_date).toDateString() === todayStr).length;
+  const recentVisits = visits.slice(0, 8);
+
+  document.getElementById('page-content').innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card"><div><div class="label">Patients Registered Today</div><div class="value">${patientsToday}</div></div><div class="stat-icon">${Icons.render('patients')}</div></div>
+      <div class="stat-card"><div><div class="label">Visits Checked In Today</div><div class="value">${visitsToday}</div></div><div class="stat-icon info">${Icons.render('visits')}</div></div>
+      <div class="stat-card"><div><div class="label">Candidates Registered Today</div><div class="value">${registrationsToday}</div></div><div class="stat-icon success">${Icons.render('employees')}</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <h3>Recent check-ins</h3>
+        <a href="visits.html" class="btn btn-ghost btn-sm">Open Visits &rarr;</a>
+      </div>
+      ${recentVisits.length ? `
+        <div class="table-wrap" style="box-shadow:none; border:none;">
+          <table class="data-table">
+            <thead><tr><th>Patient</th><th>Checked in</th><th>Status</th></tr></thead>
+            <tbody>
+              ${recentVisits.map(v => `
+                <tr onclick="window.location.href='visits.html?open=${v.id}'" style="cursor:pointer;">
+                  <td class="cell-primary">${UI.escapeHtml(v.patient ? v.patient.full_name : '—')} <span class="cell-code">${v.patient ? v.patient.patient_code : ''}</span></td>
+                  <td class="cell-muted">${UI.formatDateTime(v.visit_date)}</td>
+                  <td>${UI.visitStatusBadge(v.status)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : `<div class="empty-state"><div class="empty-icon">${Icons.render('visits')}</div><h3>No visits yet</h3><p>Check a patient in from the Patients or Visits page.</p></div>`}
+    </div>
+  `;
+}
+
+async function renderPhysicianDashboard() {
+  const session = Auth.getSession();
+  const myPhysicianId = session.user.physician_id;
+  const allVisits = await Api.visits.list();
+  const scoped = myPhysicianId ? allVisits.filter(v => v.physician_id === myPhysicianId) : allVisits;
+  const openCount = scoped.filter(v => v.status === 'open').length;
+  const examinedCount = scoped.filter(v => v.status === 'examined').length;
+  const diagnosedCount = scoped.filter(v => v.status === 'diagnosed').length;
+  const queue = scoped.filter(v => v.status !== 'closed').slice(0, 8);
+
+  document.getElementById('page-content').innerHTML = `
+    ${!myPhysicianId ? `
+      <div class="notice notice-info">
+        ${Icons.render('info')}
+        <span>Your account isn't linked to a physician record, so this shows all open visits clinic-wide rather than just your own.</span>
+      </div>
+    ` : ''}
+    <div class="stat-grid">
+      <div class="stat-card"><div><div class="label">Awaiting Exam</div><div class="value">${openCount}</div></div><div class="stat-icon">${Icons.render('visits')}</div></div>
+      <div class="stat-card"><div><div class="label">Examined, Awaiting Diagnosis</div><div class="value">${examinedCount}</div></div><div class="stat-icon amber">${Icons.render('stethoscope')}</div></div>
+      <div class="stat-card"><div><div class="label">Diagnosed, Awaiting Close</div><div class="value">${diagnosedCount}</div></div><div class="stat-icon info">${Icons.render('activity')}</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <h3>${myPhysicianId ? 'My open visits' : 'Open visits'}</h3>
+        <a href="visits.html" class="btn btn-ghost btn-sm">Open Visits &rarr;</a>
+      </div>
+      ${queue.length ? `
+        <div class="table-wrap" style="box-shadow:none; border:none;">
+          <table class="data-table">
+            <thead><tr><th>Patient</th><th>Chief complaint</th><th>Date</th><th>Status</th></tr></thead>
+            <tbody>
+              ${queue.map(v => `
+                <tr onclick="window.location.href='visits.html?open=${v.id}'" style="cursor:pointer;">
+                  <td class="cell-primary">${UI.escapeHtml(v.patient ? v.patient.full_name : '—')} <span class="cell-code">${v.patient ? v.patient.patient_code : ''}</span></td>
+                  <td class="cell-muted">${UI.escapeHtml(v.chief_complaint)}</td>
+                  <td class="cell-muted">${UI.formatDateTime(v.visit_date)}</td>
+                  <td>${UI.visitStatusBadge(v.status)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : `<div class="empty-state"><div class="empty-icon">${Icons.render('visits')}</div><h3>Queue is empty</h3><p>No open visits right now.</p></div>`}
+    </div>
+  `;
+}
+
 async function init() {
   const role = RoleGuard.restrictedRole();
   try {
     if (role === 'lab_technician') { await renderLabTechDashboard(); return; }
     if (role === 'pharmacist') { await renderPharmacistDashboard(); return; }
+    if (role === 'receptionist') { await renderReceptionistDashboard(); return; }
+    if (role === 'physician') { await renderPhysicianDashboard(); return; }
 
     const [stats, visits] = await Promise.all([Api.dashboardStats(), Api.visits.list()]);
     renderStatCards(stats);

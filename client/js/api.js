@@ -290,7 +290,7 @@ async function mockRequest(method, path, body) {
     }).filter(Boolean);
     return {
       token: uid('tok'),
-      user: { id: user.id, username: user.username, full_name: user.full_name, roles: roleDisplayNames },
+      user: { id: user.id, username: user.username, full_name: user.full_name, roles: roleDisplayNames, physician_id: user.physician_id || null },
     };
   }
 

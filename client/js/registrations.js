@@ -4,6 +4,10 @@
 
 Auth.requireAuth();
 if (RoleGuard.blockIfNotAllowed('employee-registrations')) { throw new Error('redirecting'); }
+
+// Receptionist registers and tracks candidates, but the medical exam and
+// the hire decision are a physician/HR call, not front-desk's.
+const isReceptionist = RoleGuard.restrictedRole() === 'receptionist';
 renderShell('employee-registrations');
 setPageTitle('Employee Registrations');
 
@@ -197,9 +201,9 @@ function renderRegDetail(r) {
   `;
 
   const footer = document.getElementById('reg-detail-footer');
-  const canCertify = CERTIFIABLE_STATUSES_CLIENT.includes(r.status);
+  const canCertify = CERTIFIABLE_STATUSES_CLIENT.includes(r.status) && !isReceptionist;
   const canWithdraw = r.status !== 'hired' && r.status !== 'withdrawn';
-  const canHire = r.status === 'certified_fit';
+  const canHire = r.status === 'certified_fit' && !isReceptionist;
   const canEdit = r.status !== 'hired';
 
   footer.innerHTML = `

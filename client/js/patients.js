@@ -6,14 +6,25 @@ Auth.requireAuth();
 renderShell('patients');
 setPageTitle('Patients');
 
+// Front-desk registers/edits patients but doesn't need clinical history.
+// Physicians need full clinical history but don't register/edit patients
+// themselves — that's front-desk's job. Lab/Pharmacy only need their own
+// department's records for a patient, nothing else.
+const PATIENT_PERMS = {
+  lab_technician: { create: false, edit: false, visitHistory: 'department', canStartVisit: false },
+  pharmacist: { create: false, edit: false, visitHistory: 'department', canStartVisit: false },
+  receptionist: { create: true, edit: true, visitHistory: 'none', canStartVisit: true },
+  physician: { create: false, edit: false, visitHistory: 'full', canStartVisit: true },
+};
 const restrictedRole = RoleGuard.restrictedRole();
+const perms = restrictedRole ? PATIENT_PERMS[restrictedRole] : { create: true, edit: true, visitHistory: 'full', canStartVisit: true };
 
 document.getElementById('search-icon-slot').innerHTML = Icons.render('search');
 document.getElementById('plus-icon-slot').innerHTML = Icons.render('plus');
 document.getElementById('patient-modal-close').innerHTML = Icons.render('close');
 document.getElementById('patient-detail-close').innerHTML = Icons.render('close');
 
-if (restrictedRole) {
+if (!perms.create) {
   document.getElementById('new-patient-btn').style.display = 'none';
 }
 
@@ -44,8 +55,8 @@ function renderTable(list) {
         <div class="empty-state">
           <div class="empty-icon">${Icons.render('patients')}</div>
           <h3>No patients found</h3>
-          <p>${restrictedRole ? 'Try a different search.' : 'Try a different search, or register a new patient.'}</p>
-          ${restrictedRole ? '' : `<button class="btn btn-primary" onclick="openPatientForm()">${Icons.render('plus')} New Patient</button>`}
+          <p>${perms.create ? 'Try a different search, or register a new patient.' : 'Try a different search.'}</p>
+          ${perms.create ? `<button class="btn btn-primary" onclick="openPatientForm()">${Icons.render('plus')} New Patient</button>` : ''}
         </div>
       </div>`;
     return;
@@ -71,7 +82,7 @@ function renderTable(list) {
               <td>
                 <div class="row-actions">
                   <button class="icon-btn" title="View" onclick="openPatientDetail('${p.id}')">${Icons.render('eye')}</button>
-                  ${restrictedRole ? '' : `<button class="icon-btn" title="Edit" onclick="openPatientForm('${p.id}')">${Icons.render('edit')}</button>`}
+                  ${perms.edit ? `<button class="icon-btn" title="Edit" onclick="openPatientForm('${p.id}')">${Icons.render('edit')}</button>` : ''}
                 </div>
               </td>
             </tr>
@@ -84,7 +95,7 @@ function renderTable(list) {
 
 // ---------- Add / Edit modal ----------
 async function openPatientForm(id = null) {
-  if (restrictedRole) return;
+  if (!perms.create && !perms.edit) return;
   editingId = id;
   const backdrop = document.getElementById('patient-modal-backdrop');
   const form = document.getElementById('patient-form');
@@ -165,8 +176,10 @@ async function openPatientDetail(id) {
     document.getElementById('pd-name').textContent = p.full_name;
     document.getElementById('pd-code').textContent = `${p.patient_code} · registered ${UI.formatDate(p.registered_date)}`;
 
-    if (restrictedRole) {
+    if (perms.visitHistory === 'department') {
       await renderRestrictedPatientDetail(p);
+    } else if (perms.visitHistory === 'none') {
+      renderIdentityOnlyPatientDetail(p);
     } else {
       renderFullPatientDetail(p);
     }
@@ -212,8 +225,31 @@ function renderFullPatientDetail(p) {
       ` : `<p class="text-muted" style="font-size:12.5px;">No visits recorded yet.</p>`}
     </div>
   `;
-  document.getElementById('pd-edit-btn').style.display = 'inline-flex';
-  document.getElementById('pd-new-visit-btn').style.display = 'inline-flex';
+  document.getElementById('pd-edit-btn').style.display = perms.edit ? 'inline-flex' : 'none';
+  document.getElementById('pd-new-visit-btn').style.display = perms.canStartVisit ? 'inline-flex' : 'none';
+  document.getElementById('pd-edit-btn').onclick = () => { closePatientDetail(); openPatientForm(p.id); };
+  document.getElementById('pd-new-visit-btn').onclick = () => { window.location.href = `visits.html?newFor=${p.id}`; };
+}
+
+// Receptionist: identity + contact info only, no clinical visit history —
+// that's not their concern, just registering/checking patients in.
+function renderIdentityOnlyPatientDetail(p) {
+  document.getElementById('patient-detail-body').innerHTML = `
+    <div class="detail-section">
+      <h4>Patient information</h4>
+      <div class="detail-grid">
+        <div class="detail-item"><div class="k">Gender</div><div class="v" style="text-transform:capitalize;">${p.gender || '—'}</div></div>
+        <div class="detail-item"><div class="k">Age</div><div class="v">${UI.age(p.date_of_birth)}</div></div>
+        <div class="detail-item"><div class="k">Phone</div><div class="v">${UI.escapeHtml(p.phone) || '—'}</div></div>
+        <div class="detail-item"><div class="k">Status</div><div class="v">${UI.patientStatusBadge(p.is_active)}</div></div>
+        <div class="detail-item"><div class="k">Location</div><div class="v">${UI.escapeHtml(p.location) || '—'}</div></div>
+        <div class="detail-item"><div class="k">Address</div><div class="v">${UI.escapeHtml(p.address) || '—'}</div></div>
+      </div>
+    </div>
+    <p class="text-muted" style="font-size:12.5px;">${p.visits.length} visit(s) on file. Clinical details are managed by the attending physician.</p>
+  `;
+  document.getElementById('pd-edit-btn').style.display = perms.edit ? 'inline-flex' : 'none';
+  document.getElementById('pd-new-visit-btn').style.display = perms.canStartVisit ? 'inline-flex' : 'none';
   document.getElementById('pd-edit-btn').onclick = () => { closePatientDetail(); openPatientForm(p.id); };
   document.getElementById('pd-new-visit-btn').onclick = () => { window.location.href = `visits.html?newFor=${p.id}`; };
 }

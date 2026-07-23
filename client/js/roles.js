@@ -18,16 +18,29 @@ const RoleGuard = (() => {
   };
 
   // Roles that give a user the full, unrestricted view regardless of
-  // what else they hold. Having any one of these outweighs a
-  // restricted role like lab_technician or pharmacist.
-  const ELEVATED = ['system_administrator', 'hr_admin', 'physician', 'receptionist'];
+  // what else they hold. Only back-office/admin roles get this —
+  // every clinical/front-desk role below is scoped to its own nav set.
+  const ELEVATED = ['system_administrator', 'hr_admin'];
 
   // Which nav item keys (see shell.js NAV_SECTIONS) each restricted
   // role is allowed to see. Anyone not listed here (or holding an
   // elevated role) sees the full nav, unfiltered.
+  //
+  // Receptionist: registers patients and candidates, checks patients
+  // into a visit — but doesn't touch clinical decisions, so Visits
+  // is included for check-in/list purposes only (visits.js further
+  // restricts what a receptionist can edit within that page).
+  //
+  // Physician: owns the full clinical visit workflow, and needs to
+  // reach Laboratory/Pharmacy/Admissions/Referrals to *originate*
+  // orders/prescriptions/admissions/referrals from a visit — those
+  // pages themselves aren't queue-management tools for a physician,
+  // just where "Order Lab Tests" / "Write Prescription" etc. land.
   const NAV_VISIBILITY = {
     lab_technician: ['dashboard', 'patients', 'laboratory'],
     pharmacist: ['dashboard', 'patients', 'pharmacy'],
+    receptionist: ['dashboard', 'patients', 'visits', 'employee-registrations'],
+    physician: ['dashboard', 'patients', 'visits', 'admissions', 'laboratory', 'pharmacy', 'referrals', 'employee-registrations', 'certifications'],
   };
 
   function current() {

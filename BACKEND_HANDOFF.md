@@ -156,3 +156,26 @@ either, since that's a real design decision, not "preparation":
   `verifyPassword` before allowing the change, distinct from the admin-only
   `reset-password` endpoint which doesn't require it.
 
+## Small gap found while building role-based views: `physician_id` missing from login response
+
+`client/js/dashboard.js` now shows a physician their own open visits by
+filtering on `session.user.physician_id`. Your real `POST /auth/login` in
+`server/src/routes/auth.js` doesn't include `physician_id` in the response —
+only `id`, `username`, `full_name`, `roles`. One-line fix:
+```js
+res.json({
+  token,
+  user: {
+    id: user.id,
+    username: user.username,
+    full_name: user.full_name,
+    roles: roleDisplayNames,
+    physician_id: user.physician_id || null,
+  },
+});
+```
+Until that's added, a physician logging in against the real backend will see
+the "not linked to a physician record" fallback (all open visits clinic-wide)
+instead of just their own — not broken, just less precise. The mock
+(`client/js/api.js`) already returns this field.
+

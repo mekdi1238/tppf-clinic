@@ -7,6 +7,13 @@ if (RoleGuard.blockIfNotAllowed('visits')) { throw new Error('redirecting'); }
 renderShell('visits');
 setPageTitle('Visits');
 
+// Receptionist can see and check patients into a visit, but doesn't make
+// clinical decisions — no editing exam notes/diagnosis/disposition, no
+// advancing visit status, no originating lab/pharmacy/admission/referral
+// actions from here. Every other allowed role (physician, or unrestricted)
+// keeps full access.
+const isReceptionist = RoleGuard.restrictedRole() === 'receptionist';
+
 document.getElementById('search-icon-slot').innerHTML = Icons.render('search');
 document.getElementById('plus-icon-slot').innerHTML = Icons.render('plus');
 document.getElementById('visit-modal-close').innerHTML = Icons.render('close');
@@ -149,7 +156,7 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
   document.getElementById('vd-title').textContent = v.patient ? v.patient.full_name : 'Visit';
   document.getElementById('vd-sub').textContent = `${v.patient ? v.patient.patient_code : ''} · ${UI.formatDateTime(v.visit_date)}`;
 
-  const canEditClinical = v.status !== 'closed';
+  const canEditClinical = v.status !== 'closed' && !isReceptionist;
 
   document.getElementById('visit-detail-body').innerHTML = `
     <div class="detail-section">
@@ -198,7 +205,7 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
           ${Icons.render('alert')}
           <span>Disposition is "Admitted" but no admission record exists yet. One is required before this visit can close.</span>
         </div>
-        <a href="admissions.html?newFor=${v.id}" class="btn btn-secondary btn-sm">${Icons.render('plus')} Create Admission Record</a>
+        ${isReceptionist ? '' : `<a href="admissions.html?newFor=${v.id}" class="btn btn-secondary btn-sm">${Icons.render('plus')} Create Admission Record</a>`}
       ` : `<p class="text-muted" style="font-size:12.5px;">Not applicable unless disposition is set to "Admitted".</p>`}
     </div>
 
@@ -217,7 +224,7 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
           `).join('')}
         </div>
       ` : `<p class="text-muted" style="font-size:12.5px; margin-bottom:12px;">No lab tests ordered for this visit.</p>`}
-      ${v.status !== 'closed' ? `<a href="laboratory.html?newFor=${v.id}" class="btn btn-secondary btn-sm">${Icons.render('plus')} Order Lab Tests</a>` : ''}
+      ${v.status !== 'closed' && !isReceptionist ? `<a href="laboratory.html?newFor=${v.id}" class="btn btn-secondary btn-sm">${Icons.render('plus')} Order Lab Tests</a>` : ''}
     </div>
 
     <div class="detail-section">
@@ -235,7 +242,7 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
           `).join('')}
         </div>
       ` : `<p class="text-muted" style="font-size:12.5px; margin-bottom:12px;">No prescriptions written for this visit.</p>`}
-      ${v.status !== 'closed' ? `<a href="pharmacy.html?newFor=${v.id}" class="btn btn-secondary btn-sm">${Icons.render('plus')} Write Prescription</a>` : ''}
+      ${v.status !== 'closed' && !isReceptionist ? `<a href="pharmacy.html?newFor=${v.id}" class="btn btn-secondary btn-sm">${Icons.render('plus')} Write Prescription</a>` : ''}
     </div>
 
     <div class="detail-section">
@@ -262,7 +269,7 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
           `).join('')}
         </div>
       ` : `<p class="text-muted" style="font-size:12.5px; margin-bottom:12px;">No referrals or sick leave certificates for this visit.</p>`}
-      ${v.status !== 'closed' ? `
+      ${v.status !== 'closed' && !isReceptionist ? `
         <div style="display:flex; gap:8px;">
           <a href="referrals.html?newFor=${v.id}" class="btn btn-secondary btn-sm">${Icons.render('plus')} New Referral</a>
           <a href="referrals.html?newFor=${v.id}&type=sickleave" class="btn btn-secondary btn-sm">${Icons.render('plus')} New Sick Leave</a>
@@ -298,9 +305,10 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
 
   // footer: state-machine action button
   const footer = document.getElementById('visit-detail-footer');
-  const next = NEXT_STATUS[v.status];
+  const next = isReceptionist ? null : NEXT_STATUS[v.status];
   if (!next) {
-    footer.innerHTML = `<span class="footer-note">This visit is closed.</span><button class="btn btn-secondary" id="vd-close-modal">Close</button>`;
+    const note = v.status === 'closed' ? 'This visit is closed.' : (isReceptionist ? 'Clinical status is managed by the attending physician.' : '');
+    footer.innerHTML = `<span class="footer-note">${note}</span><button class="btn btn-secondary" id="vd-close-modal">Close</button>`;
   } else {
     footer.innerHTML = `
       <button class="btn btn-secondary" id="vd-close-modal">Close</button>
