@@ -7,6 +7,7 @@ const patientsRoutes = require("./routes/patients");
 const visitsRoutes = require("./routes/visits");
 const registrationsRoutes = require("./routes/registrations");
 const certificationsRoutes = require("./routes/certifications");
+const vitalsRoutes = require("./routes/vitals");
 const notFound = require("./middleware/notFound");
 const { errorHandler } = require("./middleware/errorHandler");
 
@@ -35,6 +36,7 @@ function createApp() {
   app.use("/api/v1", visitsRoutes);
   app.use("/api/v1", registrationsRoutes);
   app.use("/api/v1", certificationsRoutes);
+  app.use("/api/v1", vitalsRoutes);
 
   app.use(express.static(path.join(__dirname, "..", "..", "client")));
 

@@ -137,26 +137,51 @@ document.getElementById('visit-form').addEventListener('submit', async (e) => {
 // ---------- Visit detail / update modal ----------
 async function openVisitDetail(id) {
   try {
-    const [v, admissions, labOrders, prescriptions, referrals, sickLeaves] = await Promise.all([
+    const [v, admissions, labOrders, prescriptions, referrals, sickLeaves, vitals] = await Promise.all([
       Api.visits.get(id),
       Api.admissions.list({ visit_id: id }),
       Api.labOrders.list({ visit_id: id }),
       Api.prescriptions.list({ visit_id: id }),
       Api.referrals.list({ visit_id: id }),
       Api.sickLeaves.list({ visit_id: id }),
+      Api.vitals.list(id),
     ]);
-    renderVisitDetail(v, admissions[0] || null, labOrders, prescriptions, referrals, sickLeaves);
+    renderVisitDetail(v, admissions[0] || null, labOrders, prescriptions, referrals, sickLeaves, vitals);
     document.getElementById('visit-detail-backdrop').classList.add('visible');
   } catch (e) {
     UI.toast(UI.errorMessage(e), 'danger');
   }
 }
 
-function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, sickLeaves) {
+function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, sickLeaves, vitals) {
   document.getElementById('vd-title').textContent = v.patient ? v.patient.full_name : 'Visit';
   document.getElementById('vd-sub').textContent = `${v.patient ? v.patient.patient_code : ''} · ${UI.formatDateTime(v.visit_date)}`;
 
   const canEditClinical = v.status !== 'closed' && !isReceptionist;
+  const canRecordVitals = v.status !== 'closed';
+
+  function renderVitalValue(val, unit) {
+    return val !== null && val !== undefined ? `<span class="vitals-value">${val}</span><span class="vitals-unit">${unit}</span>` : `<span class="vitals-value vitals-empty">—</span>`;
+  }
+
+  function renderVitalCard(vt) {
+    const bp = (vt.blood_pressure_systolic && vt.blood_pressure_diastolic)
+      ? `${vt.blood_pressure_systolic}/${vt.blood_pressure_diastolic}`
+      : (vt.blood_pressure_systolic || vt.blood_pressure_diastolic || null);
+    return `
+      <div class="vitals-card">
+        <div class="vitals-card-time">${Icons.render('clock')} ${UI.formatDateTime(vt.recorded_at)}</div>
+        <div class="vitals-metrics">
+          <div class="vitals-metric"><div class="vitals-label">Temp</div>${renderVitalValue(vt.temperature_c, '°C')}</div>
+          <div class="vitals-metric"><div class="vitals-label">BP</div>${renderVitalValue(bp, 'mmHg')}</div>
+          <div class="vitals-metric"><div class="vitals-label">Pulse</div>${renderVitalValue(vt.pulse_rate, '/min')}</div>
+          <div class="vitals-metric"><div class="vitals-label">Resp</div>${renderVitalValue(vt.respiratory_rate, '/min')}</div>
+          <div class="vitals-metric"><div class="vitals-label">Weight</div>${renderVitalValue(vt.weight_kg, 'kg')}</div>
+          <div class="vitals-metric"><div class="vitals-label">Height</div>${renderVitalValue(vt.height_cm, 'cm')}</div>
+        </div>
+      </div>
+    `;
+  }
 
   document.getElementById('visit-detail-body').innerHTML = `
     <div class="detail-section">
@@ -168,6 +193,52 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
         <div class="k">Chief complaint</div>
         <div class="v" style="font-weight:500;">${UI.escapeHtml(v.chief_complaint)}</div>
       </div>
+    </div>
+
+    <div class="detail-section">
+      <h4>${Icons.render('heartPulse')} Vitals (${vitals.length})</h4>
+      <div id="vd-vitals-list">
+        ${vitals.length ? vitals.map(renderVitalCard).join('') : `<p class="text-muted" style="font-size:12.5px; margin-bottom:12px;">No vitals recorded for this visit yet.</p>`}
+      </div>
+      ${canRecordVitals ? `
+        <button type="button" class="btn btn-secondary btn-sm" id="vd-vitals-toggle" style="margin-top:8px;">${Icons.render('plus')} Record Vitals</button>
+        <div id="vd-vitals-form-wrap" style="display:none; margin-top:14px;">
+          <div class="vitals-form-grid">
+            <div class="field">
+              <label for="vt-temp">Temperature (°C)</label>
+              <input type="number" id="vt-temp" step="0.1" min="30" max="45" placeholder="e.g. 37.0" />
+            </div>
+            <div class="field">
+              <label for="vt-bp-sys">BP Systolic</label>
+              <input type="number" id="vt-bp-sys" min="40" max="300" placeholder="e.g. 120" />
+            </div>
+            <div class="field">
+              <label for="vt-bp-dia">BP Diastolic</label>
+              <input type="number" id="vt-bp-dia" min="20" max="200" placeholder="e.g. 80" />
+            </div>
+            <div class="field">
+              <label for="vt-pulse">Pulse (/min)</label>
+              <input type="number" id="vt-pulse" min="20" max="250" placeholder="e.g. 72" />
+            </div>
+            <div class="field">
+              <label for="vt-resp">Resp. Rate (/min)</label>
+              <input type="number" id="vt-resp" min="5" max="60" placeholder="e.g. 18" />
+            </div>
+            <div class="field">
+              <label for="vt-weight">Weight (kg)</label>
+              <input type="number" id="vt-weight" step="0.1" min="0.5" max="500" placeholder="e.g. 70.0" />
+            </div>
+            <div class="field">
+              <label for="vt-height">Height (cm)</label>
+              <input type="number" id="vt-height" step="0.1" min="20" max="250" placeholder="e.g. 170" />
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:10px;">
+            <button type="button" class="btn btn-primary btn-sm" id="vd-vitals-save">${Icons.render('check')} Save Reading</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="vd-vitals-cancel">Cancel</button>
+          </div>
+        </div>
+      ` : ''}
     </div>
 
     <div class="detail-section">
@@ -281,6 +352,51 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
   `;
 
 
+  if (canRecordVitals) {
+    const toggleBtn = document.getElementById('vd-vitals-toggle');
+    const formWrap = document.getElementById('vd-vitals-form-wrap');
+    toggleBtn.addEventListener('click', () => {
+      const visible = formWrap.style.display !== 'none';
+      formWrap.style.display = visible ? 'none' : 'block';
+      toggleBtn.style.display = visible ? '' : 'none';
+    });
+    document.getElementById('vd-vitals-cancel').addEventListener('click', () => {
+      formWrap.style.display = 'none';
+      toggleBtn.style.display = '';
+    });
+    document.getElementById('vd-vitals-save').addEventListener('click', async () => {
+      const payload = {
+        temperature_c: document.getElementById('vt-temp').value || null,
+        blood_pressure_systolic: document.getElementById('vt-bp-sys').value || null,
+        blood_pressure_diastolic: document.getElementById('vt-bp-dia').value || null,
+        pulse_rate: document.getElementById('vt-pulse').value || null,
+        respiratory_rate: document.getElementById('vt-resp').value || null,
+        weight_kg: document.getElementById('vt-weight').value || null,
+        height_cm: document.getElementById('vt-height').value || null,
+      };
+      const saveBtn = document.getElementById('vd-vitals-save');
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<span class="spinner"></span> Saving…';
+      try {
+        await Api.vitals.create(v.id, payload);
+        UI.toast('Vitals recorded.');
+        // Refresh the vitals list in-place
+        const updatedVitals = await Api.vitals.list(v.id);
+        const listEl = document.getElementById('vd-vitals-list');
+        listEl.innerHTML = updatedVitals.map(renderVitalCard).join('');
+        formWrap.style.display = 'none';
+        toggleBtn.style.display = '';
+        // Reset form fields
+        ['vt-temp','vt-bp-sys','vt-bp-dia','vt-pulse','vt-resp','vt-weight','vt-height'].forEach(id => document.getElementById(id).value = '');
+      } catch (err) {
+        UI.toast(UI.errorMessage(err), 'danger');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = `${Icons.render('check')} Save Reading`;
+      }
+    });
+  }
+
   if (canEditClinical) {
     document.getElementById('vd-save-notes').addEventListener('click', async (e) => {
       const btn = e.currentTarget;
@@ -346,15 +462,16 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
       try {
         const updated = await Api.visits.update(v.id, payload);
         UI.toast(`Visit moved to "${updated.status}".`);
-        const [full, admissions, labOrders, prescriptions, referrals, sickLeaves] = await Promise.all([
+        const [full, admissions, labOrders, prescriptions, referrals, sickLeaves, vitals] = await Promise.all([
           Api.visits.get(v.id),
           Api.admissions.list({ visit_id: v.id }),
           Api.labOrders.list({ visit_id: v.id }),
           Api.prescriptions.list({ visit_id: v.id }),
           Api.referrals.list({ visit_id: v.id }),
           Api.sickLeaves.list({ visit_id: v.id }),
+          Api.vitals.list(v.id),
         ]);
-        renderVisitDetail(full, admissions[0] || null, labOrders, prescriptions, referrals, sickLeaves);
+        renderVisitDetail(full, admissions[0] || null, labOrders, prescriptions, referrals, sickLeaves, vitals);
         loadVisits();
       } catch (e) {
         document.getElementById('vd-block-notice').innerHTML = `

@@ -191,6 +191,7 @@ function buildSeed() {
       clinic_address: '',
       clinic_phone: '',
     },
+    vitals: [],
     backups: [],
     meta: { patient_seq: 6, registration_seq: 5, seeded_at: nowIso() },
   };
@@ -215,6 +216,7 @@ function migrateDb(db) {
   if (!db.sick_leaves) db.sick_leaves = [];
   if (!db.roles || !db.roles.length) db.roles = buildSeed().roles;
   if (!db.settings) db.settings = buildSeed().settings;
+  if (!db.vitals) db.vitals = [];
   if (!db.backups) db.backups = [];
   if (db.users && db.users.some(u => u.roles && !u.role_ids)) {
     const nameToId = Object.fromEntries(db.roles.map(r => [r.display_name, r.id]));
@@ -452,6 +454,38 @@ async function mockRequest(method, path, body) {
       db.visits[idx] = next;
       saveDb(db);
       return db.visits[idx];
+    }
+    // GET /visits/:id/vitals
+    if (method === 'GET' && seg.length === 3 && seg[2] === 'vitals') {
+      const v = db.visits.find(x => x.id === seg[1]);
+      if (!v) { const err = new Error('Visit not found.'); err.status = 404; throw err; }
+      return db.vitals
+        .filter(vt => String(vt.visit_id) === String(seg[1]))
+        .sort((a, b) => new Date(b.recorded_at) - new Date(a.recorded_at));
+    }
+    // POST /visits/:id/vitals
+    if (method === 'POST' && seg.length === 3 && seg[2] === 'vitals') {
+      const v = db.visits.find(x => x.id === seg[1]);
+      if (!v) { const err = new Error('Visit not found.'); err.status = 404; throw err; }
+      const fields = ['temperature_c', 'blood_pressure_systolic', 'blood_pressure_diastolic', 'pulse_rate', 'respiratory_rate', 'weight_kg', 'height_cm'];
+      const hasAny = fields.some(f => body[f] !== undefined && body[f] !== null && body[f] !== '');
+      if (!hasAny) { const err = new Error('Enter at least one vital sign reading.'); err.status = 422; throw err; }
+      const vital = {
+        id: uid('vit'),
+        visit_id: seg[1],
+        recorded_at: nowIso(),
+        recorded_by: null,
+        temperature_c: body.temperature_c || null,
+        blood_pressure_systolic: body.blood_pressure_systolic || null,
+        blood_pressure_diastolic: body.blood_pressure_diastolic || null,
+        pulse_rate: body.pulse_rate || null,
+        respiratory_rate: body.respiratory_rate || null,
+        weight_kg: body.weight_kg || null,
+        height_cm: body.height_cm || null,
+      };
+      db.vitals.unshift(vital);
+      saveDb(db);
+      return vital;
     }
   }
 
@@ -1129,6 +1163,10 @@ const Api = {
     get: (id) => apiRequest('GET', `/visits/${id}`),
     create: (data) => apiRequest('POST', '/visits', data),
     update: (id, data) => apiRequest('PUT', `/visits/${id}`, data),
+  },
+  vitals: {
+    list: (visitId) => apiRequest('GET', `/visits/${visitId}/vitals`),
+    create: (visitId, data) => apiRequest('POST', `/visits/${visitId}/vitals`, data),
   },
   registrations: {
     list: (params = {}) => apiRequest('GET', `/registrations?${new URLSearchParams(params)}`),
