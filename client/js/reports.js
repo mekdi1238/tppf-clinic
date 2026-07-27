@@ -1,14 +1,18 @@
 /* ===========================================================
    Reports page logic
    -----------------------------------------------------------
-   Read-only. Aggregates data already available through the
-   existing Api.* calls — no new backend surface needed.
+   Read-only analytics and Excel report exporter.
    =========================================================== */
 
 Auth.requireAuth();
 if (RoleGuard.blockIfNotAllowed('reports')) { throw new Error('redirecting'); }
 renderShell('reports');
 setPageTitle('Reports');
+
+const exportIconEl = document.getElementById('export-btn-icon');
+if (exportIconEl) {
+  exportIconEl.innerHTML = Icons.render('download');
+}
 
 function donut(counts, colors, centerLabel) {
   const order = Object.keys(counts);
@@ -54,6 +58,98 @@ function emptyNote(text) {
   return `<p class="text-muted" style="font-size:12.5px;">${text}</p>`;
 }
 
+function exportToExcel(reportData) {
+  const { patients, visits, registrations, certifications, admissions, labOrders, drugs } = reportData;
+  const rows = [];
+
+  const sanitize = (val) => {
+    if (val === null || val === undefined) return '""';
+    const str = String(val).replace(/"/g, '""');
+    return `"${str}"`;
+  };
+
+  rows.push(['TPPF CLINIC MANAGEMENT SYSTEM — EXECUTIVE SUMMARY REPORT']);
+  rows.push(['Generated At', new Date().toLocaleString()]);
+  rows.push([]);
+
+  // Section 1: Key Performance Metrics
+  rows.push(['1. KEY METRICS']);
+  rows.push(['Metric', 'Count']);
+  rows.push(['Active Patients', patients.filter(p => p.is_active).length]);
+  rows.push(['Open Visits', visits.filter(v => v.status !== 'closed').length]);
+  rows.push(['Currently Admitted', admissions.filter(a => a.status === 'admitted').length]);
+  rows.push(['Pending Lab Orders', labOrders.filter(o => o.status !== 'completed').length]);
+  rows.push([]);
+
+  // Section 2: Pre-Employment Registrations
+  rows.push(['2. PRE-EMPLOYMENT REGISTRATIONS']);
+  rows.push(['Registration Code', 'Full Name', 'Gender', 'Occupation', 'Location', 'Status', 'Date']);
+  registrations.forEach(r => {
+    rows.push([
+      r.registration_code || '',
+      r.full_name || '',
+      r.gender || '',
+      r.occupation || '',
+      r.location || '',
+      r.status || '',
+      r.registration_date || '',
+    ]);
+  });
+  rows.push([]);
+
+  // Section 3: Medical Certifications
+  rows.push(['3. MEDICAL CERTIFICATIONS']);
+  rows.push(['Exam Date', 'Candidate Registration ID', 'Result', 'Physical Exam', 'Other Findings']);
+  certifications.forEach(c => {
+    rows.push([
+      c.examination_date || '',
+      c.employee_registration_id || '',
+      c.result || '',
+      c.physical_examination || '',
+      c.other_findings || '',
+    ]);
+  });
+  rows.push([]);
+
+  // Section 4: Clinical Visits
+  rows.push(['4. CLINICAL VISITS']);
+  rows.push(['Visit Date', 'Patient ID', 'Chief Complaint', 'Diagnosis', 'Disposition', 'Status']);
+  visits.forEach(v => {
+    rows.push([
+      v.visit_date || '',
+      v.patient_id || '',
+      v.chief_complaint || '',
+      v.diagnosis || '',
+      v.disposition || '',
+      v.status || '',
+    ]);
+  });
+  rows.push([]);
+
+  // Section 5: Drug Inventory & Low Stock Alert
+  rows.push(['5. DRUG INVENTORY & STOCK ALERTS']);
+  rows.push(['Drug Name', 'Unit', 'Quantity On Hand', 'Reorder Threshold', 'Status']);
+  drugs.forEach(d => {
+    const qty = d.stock ? d.stock.quantity_on_hand : 0;
+    const threshold = d.stock ? d.stock.reorder_threshold : 0;
+    const status = qty <= threshold ? 'REORDER ALERT' : 'OK';
+    rows.push([d.name, d.unit || '', qty, threshold, status]);
+  });
+
+  const csvContent = '\uFEFF' + rows.map(r => r.map(sanitize).join(',')).join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const dateStr = new Date().toISOString().slice(0, 10);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `TPPF_Clinic_Report_${dateStr}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  UI.toast('Report exported to Excel (.csv) successfully.');
+}
+
 async function init() {
   try {
     const [patients, visits, registrations, certifications, admissions, labOrders, drugs] = await Promise.all([
@@ -65,6 +161,13 @@ async function init() {
       Api.labOrders.list({ status: 'all' }),
       Api.drugs.list(),
     ]);
+
+    const reportData = { patients, visits, registrations, certifications, admissions, labOrders, drugs };
+
+    const exportBtn = document.getElementById('export-excel-btn');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => exportToExcel(reportData));
+    }
 
     // Overview stats
     const activePatients = patients.filter(p => p.is_active).length;

@@ -11,7 +11,17 @@
   <div class="app-shell">
     <div id="shell-root"></div>
     <div class="main" id="main-root">
-      <main class="content" id="page-content">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+          <div>
+            <h2 style="margin:0; font-size:20px; font-weight:700; color:var(--color-text-heading, #0A4F49);">Executive Summary &amp; Analytics</h2>
+            <p class="text-muted" style="margin:4px 0 0 0; font-size:13px;">View operational metrics or export comprehensive clinic summary data.</p>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="btn btn-primary" id="export-excel-btn">
+              <span id="export-btn-icon"></span> Export to Excel (.csv)
+            </button>
+          </div>
+        </div>
 
         <div class="stat-grid" id="overview-stats"></div>
 

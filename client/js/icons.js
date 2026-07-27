@@ -39,6 +39,7 @@ const Icons = (() => {
     building: '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 7h.01M12 7h.01M16 7h.01M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01"/><path d="M10 21v-4h4v4"/>',
     arrowRight: '<path d="M5 12h14M13 6l6 6-6 6"/>',
     heartPulse: '<path d="M19.5 12.6c0 4.4-7.5 8.4-7.5 8.4s-7.5-4-7.5-8.4a4.2 4.2 0 0 1 7.5-2.6 4.2 4.2 0 0 1 7.5 2.6z"/><path d="M3.5 13h3.2l1.3-3 2 6 2-6 1.3 3h3.2"/>',
+    download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>',
   };
 
   function render(name, opts = {}) {

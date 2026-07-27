@@ -15,7 +15,7 @@ router.post("/auth/login", async (req, res, next) => {
     }
 
     const userResult = await query(
-      `SELECT id, username, password_hash, full_name, is_active
+      `SELECT id, username, password_hash, full_name, physician_id, is_active
        FROM users WHERE username = $1;`,
       [username]
     );
@@ -54,6 +54,7 @@ router.post("/auth/login", async (req, res, next) => {
         username: user.username,
         full_name: user.full_name,
         roles: roleDisplayNames,
+        physician_id: user.physician_id || null,
       },
     });
   } catch (err) {

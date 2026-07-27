@@ -95,12 +95,24 @@ router.put("/visits/:id", asyncHandler(async (req, res) => {
         `Cannot move a visit from "${current.status}" to "${req.body.status}" directly.`
       );
     }
-    if (req.body.status === "closed" && next.disposition === "admitted") {
-      throw new ApiError(
-        422,
-        "admissions_module_unavailable",
-        'This visit is marked "admitted" but the Admissions module isn\'t built yet, so no admission record can exist. Closing is blocked until that module is available.'
+    if (req.body.status === "closed") {
+      if (next.disposition === "admitted") {
+        const admission = await query(`SELECT id FROM admissions WHERE visit_id = $1;`, [req.params.id]);
+        if (!admission.rows[0]) {
+          throw new ApiError(
+            422,
+            "admission_required",
+            'Disposition is "admitted" but no admission record exists for this visit yet.'
+          );
+        }
+      }
+      const pendingLab = await query(
+        `SELECT id FROM lab_orders WHERE visit_id = $1 AND status IN ('pending', 'in_progress');`,
+        [req.params.id]
       );
+      if (pendingLab.rows[0]) {
+        throw new ApiError(422, "lab_orders_pending", "This visit has lab orders still pending or in progress.");
+      }
     }
   }
 

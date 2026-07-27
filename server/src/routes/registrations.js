@@ -1,5 +1,5 @@
 const express = require("express");
-const { query } = require("../db/pool");
+const { query, withTransaction } = require("../db/pool");
 const asyncHandler = require("../utils/asyncHandler");
 const requireAuth = require("../middleware/requireAuth");
 const { ApiError } = require("../middleware/errorHandler");
@@ -115,19 +115,23 @@ router.post("/registrations/:id/hire", asyncHandler(async (req, res) => {
     throw new ApiError(422, "not_certified_fit", "Only candidates certified fit can be hired.");
   }
 
-  const patientResult = await query(
-    `INSERT INTO patients (patient_code, full_name, date_of_birth, gender, location, address, phone, source_employee_registration_id)
-     VALUES ('S' || lpad(nextval('patient_code_seq')::text, 3, '0'), $1, $2, $3, $4, '', '', $5)
-     RETURNING *;`,
-    [registration.full_name, registration.date_of_birth, registration.gender, registration.location, registration.id]
-  );
+  const hired = await withTransaction(async (client) => {
+    const patientResult = await client.query(
+      `INSERT INTO patients (patient_code, full_name, date_of_birth, gender, location, address, phone, source_employee_registration_id)
+       VALUES ('S' || lpad(nextval('patient_code_seq')::text, 3, '0'), $1, $2, $3, $4, '', '', $5)
+       RETURNING *;`,
+      [registration.full_name, registration.date_of_birth, registration.gender, registration.location, registration.id]
+    );
 
-  const updatedRegResult = await query(
-    `UPDATE employee_registrations SET status = 'hired' WHERE id = $1 RETURNING *;`,
-    [registration.id]
-  );
+    const updatedRegResult = await client.query(
+      `UPDATE employee_registrations SET status = 'hired' WHERE id = $1 RETURNING *;`,
+      [registration.id]
+    );
 
-  res.json({ patient: patientResult.rows[0], registration: updatedRegResult.rows[0] });
+    return { patient: patientResult.rows[0], registration: updatedRegResult.rows[0] };
+  });
+
+  res.json(hired);
 }));
 
 module.exports = router;

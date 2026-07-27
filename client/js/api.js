@@ -11,8 +11,8 @@
    =========================================================== */
 
 const API_BASE = '/api/v1';   // future real backend base URL
-const USE_MOCK = true;
-const MOCK_ONLY_PATHS = ['/admissions', '/lab-orders', '/lab-test-catalog', '/drugs', '/drug-stock', '/prescriptions', '/referrals', '/sick-leaves', '/users', '/roles', '/settings', '/backups'];
+const USE_MOCK = false;
+const MOCK_ONLY_PATHS = [];
 const MOCK_DELAY = 320;       // ms, simulates network latency
 const DB_KEY = 'tppf_mock_db_v1';
 

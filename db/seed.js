@@ -8,6 +8,7 @@ const ROLES = [
   ["lab_technician", "Lab Technician"],
   ["pharmacist", "Pharmacist"],
   ["hr_admin", "HR/Admin"],
+  ["hr_reporting", "HR Reporting"],
   ["system_administrator", "System Administrator"],
 ];
 
@@ -132,6 +133,74 @@ async function main() {
         [registrationIds[2], physicianIds[1]]
       );
     }
+
+    // Seed lab_test_catalog
+    const labTests = [
+      ["WBC", "Hematology", "White Blood Cell Count"],
+      ["HGB", "Hematology", "Hemoglobin"],
+      ["PLT", "Hematology", "Platelet Count"],
+      ["RBS", "Chemistry", "Random Blood Sugar"],
+      ["FBS", "Chemistry", "Fasting Blood Sugar"],
+      ["CREA", "Chemistry", "Creatinine"],
+      ["HBSAG", "Serology", "Hepatitis B Surface Antigen"],
+      ["VDRL", "Serology", "Syphilis Screening (VDRL)"],
+      ["HIV", "Serology", "HIV Antibody Test"],
+      ["URINE", "Urinalysis", "Routine Urinalysis"],
+      ["STOOL", "Stool/Parasitology", "Stool Examination, Direct"],
+    ];
+    for (const [code, panel, displayName] of labTests) {
+      await client.query(
+        `INSERT INTO lab_test_catalog (code, panel, display_name)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (code) DO UPDATE SET panel = EXCLUDED.panel, display_name = EXCLUDED.display_name;`,
+        [code, panel, displayName]
+      );
+    }
+
+    // Seed drugs & drug_stock
+    const drugsData = [
+      ["Paracetamol 500mg", "Tablet", "Analgesic and antipyretic", 150, 20],
+      ["Amoxicillin 500mg", "Capsule", "Antibiotic", 80, 15],
+      ["Ibuprofen 400mg", "Tablet", "NSAID anti-inflammatory", 120, 20],
+      ["Omeprazole 20mg", "Capsule", "Proton pump inhibitor", 60, 10],
+      ["Metformin 500mg", "Tablet", "Antidiabetic medication", 90, 15],
+      ["Oral Rehydration Salts (ORS)", "Sachet", "Electrolyte replacement", 200, 30],
+      ["Ceftriaxone 1g", "Vial", "Injectable antibiotic", 25, 5],
+      ["Azithromycin 500mg", "Tablet", "Macrolide antibiotic", 45, 10],
+    ];
+    for (const [name, unit, description, initialQty, reorderThreshold] of drugsData) {
+      const drugRes = await client.query(
+        `INSERT INTO drugs (name, unit, description)
+         VALUES ($1, $2, $3)
+         ON CONFLICT DO NOTHING
+         RETURNING id;`,
+        [name, unit, description]
+      );
+      let drugId = drugRes.rows[0]?.id;
+      if (!drugId) {
+        const existingDrug = await client.query(`SELECT id FROM drugs WHERE name = $1;`, [name]);
+        drugId = existingDrug.rows[0]?.id;
+      }
+      if (drugId) {
+        await client.query(
+          `INSERT INTO drug_stock (drug_id, quantity_on_hand, reorder_threshold)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (drug_id) DO UPDATE SET quantity_on_hand = EXCLUDED.quantity_on_hand, reorder_threshold = EXCLUDED.reorder_threshold;`,
+          [drugId, initialQty, reorderThreshold]
+        );
+      }
+    }
+
+    // Seed clinic_settings
+    await client.query(
+      `INSERT INTO clinic_settings (id, clinic_name, clinic_tagline, clinic_address, clinic_phone)
+       VALUES (1, 'TPPF Clinic', 'Quality Healthcare & Occupational Services', 'Bole, Addis Ababa, Ethiopia', '+251 11 600 0000')
+       ON CONFLICT (id) DO UPDATE SET
+         clinic_name = EXCLUDED.clinic_name,
+         clinic_tagline = EXCLUDED.clinic_tagline,
+         clinic_address = EXCLUDED.clinic_address,
+         clinic_phone = EXCLUDED.clinic_phone;`
+    );
 
     console.log("Seed complete.");
   } finally {

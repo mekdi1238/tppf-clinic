@@ -14,6 +14,7 @@ const RoleGuard = (() => {
     'Lab Technician': 'lab_technician',
     'Pharmacist': 'pharmacist',
     'HR/Admin': 'hr_admin',
+    'HR Reporting': 'hr_reporting',
     'System Administrator': 'system_administrator',
   };
 
@@ -26,17 +27,9 @@ const RoleGuard = (() => {
   // role is allowed to see. Anyone not listed here (or holding an
   // elevated role) sees the full nav, unfiltered.
   //
-  // Receptionist: registers patients and candidates, checks patients
-  // into a visit — but doesn't touch clinical decisions, so Visits
-  // is included for check-in/list purposes only (visits.js further
-  // restricts what a receptionist can edit within that page).
-  //
-  // Physician: owns the full clinical visit workflow, and needs to
-  // reach Laboratory/Pharmacy/Admissions/Referrals to *originate*
-  // orders/prescriptions/admissions/referrals from a visit — those
-  // pages themselves aren't queue-management tools for a physician,
-  // just where "Order Lab Tests" / "Write Prescription" etc. land.
+  // HR Reporting: restricted purely to viewing analytics & reports.
   const NAV_VISIBILITY = {
+    hr_reporting: ['reports'],
     lab_technician: ['dashboard', 'patients', 'laboratory'],
     pharmacist: ['dashboard', 'patients', 'pharmacy'],
     receptionist: ['dashboard', 'patients', 'visits', 'employee-registrations'],
@@ -80,7 +73,8 @@ const RoleGuard = (() => {
   function blockIfNotAllowed(pageKey) {
     const allowed = allowedNavKeys();
     if (allowed && !allowed.includes(pageKey)) {
-      window.location.replace('dashboard.html');
+      const target = allowed.includes('dashboard') ? 'dashboard.html' : `${allowed[0]}.html`;
+      window.location.replace(target);
       return true;
     }
     return false;
