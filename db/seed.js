@@ -33,21 +33,6 @@ async function main() {
       roleIds[name] = result.rows[0].id;
     }
 
-    const adminPasswordHash = await bcrypt.hash("admin123", 10);
-    const adminResult = await client.query(
-      `INSERT INTO users (username, password_hash, full_name)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash
-       RETURNING id;`,
-      ["admin", adminPasswordHash, "System Administrator"]
-    );
-    const adminId = adminResult.rows[0].id;
-    await client.query(
-      `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)
-       ON CONFLICT DO NOTHING;`,
-      [adminId, roleIds.system_administrator]
-    );
-
     const physicianRows = [
       ["Dr. Selamawit Girma", "female", "2019-03-11", "ML-2201", "General Practitioner, MD"],
       ["Dr. Tesfaye Bekele", "male", "2016-08-02", "ML-1189", "Occupational Medicine, MD"],
@@ -62,6 +47,35 @@ async function main() {
         [fullName, gender, dateRecruited, licenseNo, qualification]
       );
       physicianIds.push(result.rows[0].id);
+    }
+
+    const demoUsers = [
+      ["admin", "admin123", "System Administrator", "system_administrator", null],
+      ["receptionist", "reception123", "Front Desk Receptionist", "receptionist", null],
+      ["physician", "physician123", "Dr. Selamawit Girma", "physician", physicianIds[0] || null],
+      ["labtech", "labtech123", "Clinical Lab Technician", "lab_technician", null],
+      ["pharmacist", "pharmacy123", "Staff Pharmacist", "pharmacist", null],
+      ["hr_admin", "hradmin123", "HR Administrator", "hr_admin", null],
+      ["hr_user", "hrpassword123", "HR Reporting User", "hr_reporting", null],
+    ];
+
+    for (const [username, password, fullName, roleName, physicianId] of demoUsers) {
+      const pwHash = await bcrypt.hash(password, 10);
+      const userRes = await client.query(
+        `INSERT INTO users (username, password_hash, full_name, physician_id)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, physician_id = EXCLUDED.physician_id
+         RETURNING id;`,
+        [username, pwHash, fullName, physicianId]
+      );
+      const uid = userRes.rows[0].id;
+      if (roleIds[roleName]) {
+        await client.query(
+          `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)
+           ON CONFLICT DO NOTHING;`,
+          [uid, roleIds[roleName]]
+        );
+      }
     }
 
     const patientRows = [
@@ -108,7 +122,7 @@ async function main() {
       const result = await client.query(
         `INSERT INTO employee_registrations (registration_code, full_name, date_of_birth, gender, location, occupation, status)
          VALUES ('R' || lpad(nextval('registration_code_seq')::text, 3, '0'), $1, $2, $3, $4, $5, $6)
-         RETURNING id;`,
+         RETURNING *;`,
         [fullName, dob, gender, location, occupation, status]
       );
       if (result.rows[0]) registrationIds.push(result.rows[0].id);

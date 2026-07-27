@@ -140,6 +140,10 @@ const UI = (() => {
     return `<div class="avatar" style="${extraStyle}">${escapeHtml(initials)}</div>`;
   }
 
+  function errorMessage(e) {
+    return (e && e.message) ? e.message : 'Something went wrong. Please try again.';
+  }
+
   return { toast, escapeHtml, formatDate, formatDateTime, age, visitStatusBadge, patientStatusBadge, registrationStatusBadge, certResultBadge, admissionStatusBadge, labOrderStatusBadge, prescriptionStatusBadge, stockBadge, errorMessage, avatar };
 })();
 
