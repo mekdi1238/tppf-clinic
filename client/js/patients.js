@@ -6,10 +6,6 @@ Auth.requireAuth();
 renderShell('patients');
 setPageTitle('Patients');
 
-// Front-desk registers/edits patients but doesn't need clinical history.
-// Physicians need full clinical history but don't register/edit patients
-// themselves — that's front-desk's job. Lab/Pharmacy only need their own
-// department's records for a patient, nothing else.
 const PATIENT_PERMS = {
   lab_technician: { create: false, edit: false, visitHistory: 'department', canStartVisit: false },
   pharmacist: { create: false, edit: false, visitHistory: 'department', canStartVisit: false },
@@ -73,7 +69,12 @@ function renderTable(list) {
           ${list.map(p => `
             <tr>
               <td><span class="cell-code">${p.patient_code}</span></td>
-              <td class="cell-primary" style="cursor:pointer;" onclick="openPatientDetail('${p.id}')">${UI.escapeHtml(p.full_name)}</td>
+              <td class="cell-primary" style="cursor:pointer;" onclick="openPatientDetail('${p.id}')">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  ${UI.avatar(p.full_name, p.photo_url, 'width:32px; height:32px; font-size:11px;')}
+                  <span>${UI.escapeHtml(p.full_name)}</span>
+                </div>
+              </td>
               <td class="cell-muted" style="text-transform:capitalize;">${p.gender || '—'}</td>
               <td class="cell-muted">${UI.age(p.date_of_birth)}</td>
               <td class="cell-muted">${UI.escapeHtml(p.phone) || '—'}</td>
@@ -102,6 +103,7 @@ async function openPatientForm(id = null) {
   form.reset();
   document.getElementById('patient-form-note').textContent = '';
 
+  let initialPhoto = '';
   if (id) {
     let p;
     try {
@@ -118,11 +120,26 @@ async function openPatientForm(id = null) {
     document.getElementById('pf-phone').value = p.phone || '';
     document.getElementById('pf-location').value = p.location || '';
     document.getElementById('pf-address').value = p.address || '';
+    initialPhoto = p.photo_url || '';
   } else {
     document.getElementById('patient-modal-title').textContent = 'New Patient';
     document.getElementById('patient-modal-sub').textContent = 'Add a walk-in patient to the clinic register.';
     document.getElementById('patient-form-note').textContent = 'A patient code (S0xx) will be assigned automatically.';
   }
+
+  const photoContainer = document.getElementById('pf-photo-container');
+  if (photoContainer && typeof CameraWidget !== 'undefined') {
+    photoContainer.innerHTML = CameraWidget.renderPickerHtml({
+      hiddenInputId: 'pf-photo-url',
+      previewImgId: 'pf-photo-preview',
+      initialUrl: initialPhoto,
+    });
+    CameraWidget.bindEvents({
+      hiddenInputId: 'pf-photo-url',
+      previewImgId: 'pf-photo-preview',
+    });
+  }
+
   backdrop.classList.add('visible');
 }
 
@@ -140,6 +157,7 @@ document.getElementById('patient-modal-backdrop').addEventListener('click', (e) 
 
 document.getElementById('patient-form').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const photoInput = document.getElementById('pf-photo-url');
   const payload = {
     full_name: document.getElementById('pf-full-name').value.trim(),
     date_of_birth: document.getElementById('pf-dob').value || null,
@@ -147,6 +165,7 @@ document.getElementById('patient-form').addEventListener('submit', async (e) => 
     phone: document.getElementById('pf-phone').value.trim(),
     location: document.getElementById('pf-location').value.trim(),
     address: document.getElementById('pf-address').value.trim(),
+    photo_url: photoInput ? photoInput.value : null,
   };
   const btn = document.getElementById('patient-form-submit');
   btn.disabled = true;
@@ -173,7 +192,12 @@ document.getElementById('patient-form').addEventListener('submit', async (e) => 
 async function openPatientDetail(id) {
   try {
     const p = await Api.patients.get(id);
-    document.getElementById('pd-name').textContent = p.full_name;
+    document.getElementById('pd-name').innerHTML = `
+      <div style="display:flex; align-items:center; gap:12px;">
+        ${UI.avatar(p.full_name, p.photo_url, 'width:44px; height:44px; font-size:16px;')}
+        <div>${UI.escapeHtml(p.full_name)}</div>
+      </div>
+    `;
     document.getElementById('pd-code').textContent = `${p.patient_code} · registered ${UI.formatDate(p.registered_date)}`;
 
     if (perms.visitHistory === 'department') {
@@ -231,8 +255,6 @@ function renderFullPatientDetail(p) {
   document.getElementById('pd-new-visit-btn').onclick = () => { window.location.href = `visits.html?newFor=${p.id}`; };
 }
 
-// Receptionist: identity + contact info only, no clinical visit history —
-// that's not their concern, just registering/checking patients in.
 function renderIdentityOnlyPatientDetail(p) {
   document.getElementById('patient-detail-body').innerHTML = `
     <div class="detail-section">
@@ -254,9 +276,6 @@ function renderIdentityOnlyPatientDetail(p) {
   document.getElementById('pd-new-visit-btn').onclick = () => { window.location.href = `visits.html?newFor=${p.id}`; };
 }
 
-// Lab techs and pharmacists get identity info plus only the work items
-// tied to their own department — no clinical notes/diagnosis, no edit
-// or visit-creation actions, no hire-lineage/HR details.
 async function renderRestrictedPatientDetail(p) {
   const visitIds = new Set(p.visits.map(v => v.id));
   const baseInfo = `

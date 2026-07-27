@@ -58,7 +58,7 @@ router.get("/registrations/:id", asyncHandler(async (req, res) => {
 }));
 
 router.post("/registrations", asyncHandler(async (req, res) => {
-  const { full_name, occupation, date_of_birth, gender, location } = req.body;
+  const { full_name, occupation, date_of_birth, gender, location, photo_url } = req.body;
   if (!full_name || !full_name.trim()) {
     throw new ApiError(422, "full_name_required", "Full name is required.");
   }
@@ -67,10 +67,10 @@ router.post("/registrations", asyncHandler(async (req, res) => {
   }
 
   const result = await query(
-    `INSERT INTO employee_registrations (registration_code, full_name, date_of_birth, gender, location, occupation, status)
-     VALUES ('R' || lpad(nextval('registration_code_seq')::text, 3, '0'), $1, $2, $3, $4, $5, 'pending')
+    `INSERT INTO employee_registrations (registration_code, full_name, date_of_birth, gender, location, occupation, photo_url, status)
+     VALUES ('R' || lpad(nextval('registration_code_seq')::text, 3, '0'), $1, $2, $3, $4, $5, $6, 'pending')
      RETURNING *;`,
-    [full_name.trim(), date_of_birth || null, gender || null, location || "", occupation.trim()]
+    [full_name.trim(), date_of_birth || null, gender || null, location || "", occupation.trim(), photo_url || null]
   );
   res.status(201).json(result.rows[0]);
 }));
@@ -87,7 +87,7 @@ router.put("/registrations/:id", asyncHandler(async (req, res) => {
     );
   }
 
-  const editable = ["full_name", "date_of_birth", "gender", "location", "occupation", "status"];
+  const editable = ["full_name", "date_of_birth", "gender", "location", "occupation", "photo_url", "status"];
   const updates = [];
   const params = [];
   for (const key of editable) {
@@ -117,10 +117,10 @@ router.post("/registrations/:id/hire", asyncHandler(async (req, res) => {
 
   const hired = await withTransaction(async (client) => {
     const patientResult = await client.query(
-      `INSERT INTO patients (patient_code, full_name, date_of_birth, gender, location, address, phone, source_employee_registration_id)
-       VALUES ('S' || lpad(nextval('patient_code_seq')::text, 3, '0'), $1, $2, $3, $4, '', '', $5)
+      `INSERT INTO patients (patient_code, full_name, date_of_birth, gender, location, address, phone, photo_url, source_employee_registration_id)
+       VALUES ('S' || lpad(nextval('patient_code_seq')::text, 3, '0'), $1, $2, $3, $4, '', '', $5, $6)
        RETURNING *;`,
-      [registration.full_name, registration.date_of_birth, registration.gender, registration.location, registration.id]
+      [registration.full_name, registration.date_of_birth, registration.gender, registration.location, registration.photo_url || null, registration.id]
     );
 
     const updatedRegResult = await client.query(

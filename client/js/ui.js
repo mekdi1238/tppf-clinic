@@ -132,11 +132,15 @@ const UI = (() => {
       : `<span class="badge badge-success"><span class="badge-dot"></span>In stock</span>`;
   }
 
-  function errorMessage(e) {
-    return (e && e.message) ? e.message : 'Something went wrong. Please try again.';
+  function avatar(name, photoUrl, extraStyle = '') {
+    if (photoUrl) {
+      return `<div class="avatar" style="overflow:hidden; padding:0; ${extraStyle}"><img src="${escapeHtml(photoUrl)}" style="width:100%; height:100%; object-fit:cover;" alt="${escapeHtml(name || '')}" /></div>`;
+    }
+    const initials = (typeof Auth !== 'undefined' && Auth.initials) ? Auth.initials(name || '?') : '?';
+    return `<div class="avatar" style="${extraStyle}">${escapeHtml(initials)}</div>`;
   }
 
-  return { toast, escapeHtml, formatDate, formatDateTime, age, visitStatusBadge, patientStatusBadge, registrationStatusBadge, certResultBadge, admissionStatusBadge, labOrderStatusBadge, prescriptionStatusBadge, stockBadge, errorMessage };
+  return { toast, escapeHtml, formatDate, formatDateTime, age, visitStatusBadge, patientStatusBadge, registrationStatusBadge, certResultBadge, admissionStatusBadge, labOrderStatusBadge, prescriptionStatusBadge, stockBadge, errorMessage, avatar };
 })();
 
 // Escape key closes whichever modal is currently open, on any page.

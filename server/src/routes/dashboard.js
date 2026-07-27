@@ -42,7 +42,7 @@ router.get("/dashboard/stats", asyncHandler(async (req, res) => {
 
 router.get("/physicians", asyncHandler(async (req, res) => {
   const result = await query(
-    `SELECT id, full_name, gender, date_recruited, license_no, qualification, is_active
+    `SELECT id, full_name, gender, date_recruited, license_no, qualification, photo_url, is_active
      FROM physicians WHERE is_active = true ORDER BY full_name;`
   );
   res.json(result.rows);

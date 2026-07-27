@@ -1,8 +1,5 @@
 /* ===========================================================
    Users & Roles page logic
-   -----------------------------------------------------------
-   Mock-only until the real backend routes exist (see
-   BACKEND_HANDOFF.md). Physicians come from the real API.
    =========================================================== */
 
 Auth.requireAuth();
@@ -74,7 +71,12 @@ function renderTable(list) {
         <tbody>
           ${list.map(u => `
             <tr>
-              <td class="cell-primary" style="cursor:pointer;" onclick="openUserEdit('${u.id}')">${UI.escapeHtml(u.username)}</td>
+              <td class="cell-primary" style="cursor:pointer;" onclick="openUserEdit('${u.id}')">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  ${UI.avatar(u.full_name || u.username, u.photo_url, 'width:28px; height:28px; font-size:10px;')}
+                  <span>${UI.escapeHtml(u.username)}</span>
+                </div>
+              </td>
               <td class="cell-muted">${UI.escapeHtml(u.full_name) || '—'}</td>
               <td>${u.roles.map(r => `<span class="badge badge-primary" style="margin-right:4px;">${UI.escapeHtml(r.display_name)}</span>`).join('')}</td>
               <td class="cell-muted">${u.physician_id ? UI.escapeHtml((physiciansCache.find(p => p.id === u.physician_id) || {}).full_name || '—') : '—'}</td>
@@ -93,6 +95,20 @@ function renderTable(list) {
 function openUserForm() {
   document.getElementById('user-form').reset();
   document.querySelectorAll('#uf-roles-list .role-checkbox').forEach(cb => { cb.checked = false; });
+
+  const photoContainer = document.getElementById('uf-photo-container');
+  if (photoContainer && typeof CameraWidget !== 'undefined') {
+    photoContainer.innerHTML = CameraWidget.renderPickerHtml({
+      hiddenInputId: 'uf-photo-url',
+      previewImgId: 'uf-photo-preview',
+      initialUrl: '',
+    });
+    CameraWidget.bindEvents({
+      hiddenInputId: 'uf-photo-url',
+      previewImgId: 'uf-photo-preview',
+    });
+  }
+
   document.getElementById('user-modal-backdrop').classList.add('visible');
 }
 function closeUserForm() { document.getElementById('user-modal-backdrop').classList.remove('visible'); }
@@ -104,12 +120,14 @@ document.getElementById('user-modal-backdrop').addEventListener('click', (e) => 
 document.getElementById('user-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const roleIds = Array.from(document.querySelectorAll('#uf-roles-list .role-checkbox:checked')).map(cb => cb.value);
+  const photoInput = document.getElementById('uf-photo-url');
   const payload = {
     username: document.getElementById('uf-username').value.trim(),
     password: document.getElementById('uf-password').value,
     full_name: document.getElementById('uf-full-name').value.trim(),
     physician_id: document.getElementById('uf-physician').value || null,
     role_ids: roleIds,
+    photo_url: photoInput ? photoInput.value : null,
   };
   if (!roleIds.length) { UI.toast('Assign at least one role.', 'danger'); return; }
 

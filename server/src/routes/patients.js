@@ -43,22 +43,22 @@ router.get("/patients/:id", asyncHandler(async (req, res) => {
 }));
 
 router.post("/patients", asyncHandler(async (req, res) => {
-  const { full_name, date_of_birth, gender, location, address, phone } = req.body;
+  const { full_name, date_of_birth, gender, location, address, phone, photo_url } = req.body;
   if (!full_name || !full_name.trim()) {
     throw new ApiError(422, "full_name_required", "Full name is required.");
   }
 
   const result = await query(
-    `INSERT INTO patients (patient_code, full_name, date_of_birth, gender, location, address, phone)
-     VALUES ('S' || lpad(nextval('patient_code_seq')::text, 3, '0'), $1, $2, $3, $4, $5, $6)
+    `INSERT INTO patients (patient_code, full_name, date_of_birth, gender, location, address, phone, photo_url)
+     VALUES ('S' || lpad(nextval('patient_code_seq')::text, 3, '0'), $1, $2, $3, $4, $5, $6, $7)
      RETURNING *;`,
-    [full_name.trim(), date_of_birth || null, gender || null, location || "", address || "", phone || ""]
+    [full_name.trim(), date_of_birth || null, gender || null, location || "", address || "", phone || "", photo_url || null]
   );
   res.status(201).json(result.rows[0]);
 }));
 
 router.put("/patients/:id", asyncHandler(async (req, res) => {
-  const editable = ["full_name", "date_of_birth", "gender", "location", "address", "phone", "is_active"];
+  const editable = ["full_name", "date_of_birth", "gender", "location", "address", "phone", "photo_url", "is_active"];
   const updates = [];
   const params = [];
 

@@ -5,8 +5,6 @@
 Auth.requireAuth();
 if (RoleGuard.blockIfNotAllowed('employee-registrations')) { throw new Error('redirecting'); }
 
-// Receptionist registers and tracks candidates, but the medical exam and
-// the hire decision are a physician/HR call, not front-desk's.
 const isReceptionist = RoleGuard.restrictedRole() === 'receptionist';
 renderShell('employee-registrations');
 setPageTitle('Employee Registrations');
@@ -68,7 +66,12 @@ function renderTable(list) {
           ${list.map(r => `
             <tr>
               <td><span class="cell-code">${r.registration_code}</span></td>
-              <td class="cell-primary" style="cursor:pointer;" onclick="openRegDetail('${r.id}')">${UI.escapeHtml(r.full_name)}</td>
+              <td class="cell-primary" style="cursor:pointer;" onclick="openRegDetail('${r.id}')">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  ${UI.avatar(r.full_name, r.photo_url, 'width:32px; height:32px; font-size:11px;')}
+                  <span>${UI.escapeHtml(r.full_name)}</span>
+                </div>
+              </td>
               <td class="cell-muted" style="text-transform:capitalize;">${r.gender || '—'}</td>
               <td class="cell-muted">${UI.age(r.date_of_birth)}</td>
               <td class="cell-muted">${UI.escapeHtml(r.occupation)}</td>
@@ -88,6 +91,8 @@ async function openRegForm(id = null) {
   editingRegId = id;
   const form = document.getElementById('reg-form');
   form.reset();
+
+  let initialPhoto = '';
   if (id) {
     let r;
     try {
@@ -104,11 +109,26 @@ async function openRegForm(id = null) {
     document.getElementById('rf-gender').value = r.gender || '';
     document.getElementById('rf-location').value = r.location || '';
     document.getElementById('rf-occupation').value = r.occupation || '';
+    initialPhoto = r.photo_url || '';
   } else {
     document.querySelector('#reg-modal-backdrop h2').textContent = 'New Registration';
     document.querySelector('#reg-modal-backdrop .modal-header p').textContent = 'Register a pre-employment candidate.';
     document.getElementById('reg-form-note').textContent = 'A registration code (R0xx) will be assigned automatically.';
   }
+
+  const photoContainer = document.getElementById('rf-photo-container');
+  if (photoContainer && typeof CameraWidget !== 'undefined') {
+    photoContainer.innerHTML = CameraWidget.renderPickerHtml({
+      hiddenInputId: 'rf-photo-url',
+      previewImgId: 'rf-photo-preview',
+      initialUrl: initialPhoto,
+    });
+    CameraWidget.bindEvents({
+      hiddenInputId: 'rf-photo-url',
+      previewImgId: 'rf-photo-preview',
+    });
+  }
+
   document.getElementById('reg-modal-backdrop').classList.add('visible');
 }
 function closeRegForm() {
@@ -124,12 +144,14 @@ document.getElementById('reg-modal-backdrop').addEventListener('click', (e) => {
 
 document.getElementById('reg-form').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const photoInput = document.getElementById('rf-photo-url');
   const payload = {
     full_name: document.getElementById('rf-full-name').value.trim(),
     date_of_birth: document.getElementById('rf-dob').value || null,
     gender: document.getElementById('rf-gender').value || null,
     location: document.getElementById('rf-location').value.trim(),
     occupation: document.getElementById('rf-occupation').value.trim(),
+    photo_url: photoInput ? photoInput.value : null,
   };
   const btn = document.getElementById('reg-form-submit');
   btn.disabled = true;
@@ -164,7 +186,12 @@ async function openRegDetail(id) {
 }
 
 function renderRegDetail(r) {
-  document.getElementById('rd-name').textContent = r.full_name;
+  document.getElementById('rd-name').innerHTML = `
+    <div style="display:flex; align-items:center; gap:12px;">
+      ${UI.avatar(r.full_name, r.photo_url, 'width:44px; height:44px; font-size:16px;')}
+      <div>${UI.escapeHtml(r.full_name)}</div>
+    </div>
+  `;
   document.getElementById('rd-code').textContent = `${r.registration_code} · registered ${UI.formatDate(r.registration_date)}`;
 
   document.getElementById('reg-detail-body').innerHTML = `
