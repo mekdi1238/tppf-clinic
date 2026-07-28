@@ -2,6 +2,7 @@ const express = require("express");
 const { query } = require("../db/pool");
 const asyncHandler = require("../utils/asyncHandler");
 const requireAuth = require("../middleware/requireAuth");
+const requireRole = require("../middleware/requireRole");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -19,7 +20,7 @@ router.get("/settings", asyncHandler(async (req, res) => {
   res.json(result.rows[0]);
 }));
 
-router.put("/settings", asyncHandler(async (req, res) => {
+router.put("/settings", requireRole("system_administrator"), asyncHandler(async (req, res) => {
   const { clinic_name, clinic_tagline, clinic_address, clinic_phone } = req.body;
 
   const result = await query(

@@ -2,7 +2,12 @@ const express = require("express");
 const { query, withTransaction } = require("../db/pool");
 const asyncHandler = require("../utils/asyncHandler");
 const requireAuth = require("../middleware/requireAuth");
+const requireRole = require("../middleware/requireRole");
 const { ApiError } = require("../middleware/errorHandler");
+
+const RX_READ = requireRole("physician", "pharmacist", "system_administrator", "hr_admin");
+const RX_PRESCRIBE = requireRole("physician", "system_administrator", "hr_admin");
+const RX_DISPENSE = requireRole("pharmacist", "system_administrator", "hr_admin");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -24,7 +29,7 @@ async function embedPrescription(rx) {
   return { ...rx, items: withRemaining, status };
 }
 
-router.get("/drugs", asyncHandler(async (req, res) => {
+router.get("/drugs", RX_READ, asyncHandler(async (req, res) => {
   const result = await query(
     `SELECT d.*, row_to_json(s.*) AS stock
      FROM drugs d
@@ -34,7 +39,7 @@ router.get("/drugs", asyncHandler(async (req, res) => {
   res.json(result.rows);
 }));
 
-router.post("/drugs", asyncHandler(async (req, res) => {
+router.post("/drugs", RX_DISPENSE, asyncHandler(async (req, res) => {
   const { name, unit, description, initial_quantity, reorder_threshold } = req.body;
   if (!name || !name.trim()) throw new ApiError(422, "name_required", "Drug name is required.");
 
@@ -53,7 +58,7 @@ router.post("/drugs", asyncHandler(async (req, res) => {
   res.status(201).json(created);
 }));
 
-router.put("/drug-stock/:drugId", asyncHandler(async (req, res) => {
+router.put("/drug-stock/:drugId", RX_DISPENSE, asyncHandler(async (req, res) => {
   const delta = Number(req.body.delta) || 0;
   const current = await query(`SELECT * FROM drug_stock WHERE drug_id = $1;`, [req.params.drugId]);
   if (!current.rows[0]) throw new ApiError(404, "stock_not_found", "Stock record not found.");
@@ -68,7 +73,7 @@ router.put("/drug-stock/:drugId", asyncHandler(async (req, res) => {
   res.json(result.rows[0]);
 }));
 
-router.get("/prescriptions", asyncHandler(async (req, res) => {
+router.get("/prescriptions", RX_READ, asyncHandler(async (req, res) => {
   const { search, status, visit_id } = req.query;
   const conditions = [];
   const params = [];
@@ -96,13 +101,13 @@ router.get("/prescriptions", asyncHandler(async (req, res) => {
   res.json(withItems);
 }));
 
-router.get("/prescriptions/:id", asyncHandler(async (req, res) => {
+router.get("/prescriptions/:id", RX_READ, asyncHandler(async (req, res) => {
   const result = await query(`SELECT * FROM prescriptions WHERE id = $1;`, [req.params.id]);
   if (!result.rows[0]) throw new ApiError(404, "prescription_not_found", "Prescription not found.");
   res.json(await embedPrescription(result.rows[0]));
 }));
 
-router.post("/prescriptions", asyncHandler(async (req, res) => {
+router.post("/prescriptions", RX_PRESCRIBE, asyncHandler(async (req, res) => {
   const { visit_id, physician_id, diagnosis_note, items } = req.body;
   if (!visit_id) throw new ApiError(422, "visit_required", "A visit is required.");
   if (!Array.isArray(items) || !items.length) throw new ApiError(422, "items_required", "Add at least one drug.");
@@ -131,34 +136,40 @@ router.post("/prescriptions", asyncHandler(async (req, res) => {
   res.status(201).json(await embedPrescription(createdRx));
 }));
 
-router.post("/prescriptions/:id/dispense", asyncHandler(async (req, res) => {
+router.post("/prescriptions/:id/dispense", RX_DISPENSE, asyncHandler(async (req, res) => {
   const { item_id, quantity, notes } = req.body;
   const qty = Number(quantity);
   if (!qty || qty <= 0) throw new ApiError(422, "quantity_required", "Enter a quantity to dispense.");
 
-  const itemResult = await query(
-    `SELECT * FROM prescription_items WHERE id = $1 AND prescription_id = $2;`,
-    [item_id, req.params.id]
-  );
-  const item = itemResult.rows[0];
-  if (!item) throw new ApiError(404, "item_not_found", "Prescription item not found.");
-
-  const dispensedResult = await query(
-    `SELECT COALESCE(SUM(quantity_dispensed), 0) AS total FROM dispensing_records WHERE prescription_item_id = $1;`,
-    [item_id]
-  );
-  const remaining = Number(item.quantity_prescribed) - Number(dispensedResult.rows[0].total);
-  if (qty > remaining) {
-    throw new ApiError(422, "exceeds_remaining", `Cannot dispense more than the ${remaining} unit(s) remaining on this item.`);
-  }
-
-  const stockResult = await query(`SELECT * FROM drug_stock WHERE drug_id = $1;`, [item.drug_id]);
-  const stock = stockResult.rows[0];
-  if (!stock || stock.quantity_on_hand < qty) {
-    throw new ApiError(422, "insufficient_stock", "Not enough stock on hand to dispense this quantity.");
-  }
-
   await withTransaction(async (client) => {
+    // Validate the prescription item exists
+    const itemResult = await client.query(
+      `SELECT * FROM prescription_items WHERE id = $1 AND prescription_id = $2;`,
+      [item_id, req.params.id]
+    );
+    const item = itemResult.rows[0];
+    if (!item) throw new ApiError(404, "item_not_found", "Prescription item not found.");
+
+    // Check remaining quantity (inside transaction for consistency)
+    const dispensedResult = await client.query(
+      `SELECT COALESCE(SUM(quantity_dispensed), 0) AS total FROM dispensing_records WHERE prescription_item_id = $1;`,
+      [item_id]
+    );
+    const remaining = Number(item.quantity_prescribed) - Number(dispensedResult.rows[0].total);
+    if (qty > remaining) {
+      throw new ApiError(422, "exceeds_remaining", `Cannot dispense more than the ${remaining} unit(s) remaining on this item.`);
+    }
+
+    // Lock the stock row to prevent concurrent dispensing race conditions
+    const stockResult = await client.query(
+      `SELECT * FROM drug_stock WHERE drug_id = $1 FOR UPDATE;`,
+      [item.drug_id]
+    );
+    const stock = stockResult.rows[0];
+    if (!stock || stock.quantity_on_hand < qty) {
+      throw new ApiError(422, "insufficient_stock", "Not enough stock on hand to dispense this quantity.");
+    }
+
     await client.query(
       `UPDATE drug_stock SET quantity_on_hand = quantity_on_hand - $1 WHERE drug_id = $2;`,
       [qty, item.drug_id]

@@ -2,7 +2,12 @@ const express = require("express");
 const { query } = require("../db/pool");
 const asyncHandler = require("../utils/asyncHandler");
 const requireAuth = require("../middleware/requireAuth");
+const requireRole = require("../middleware/requireRole");
 const { ApiError } = require("../middleware/errorHandler");
+
+const LAB_READ = requireRole("physician", "lab_technician", "system_administrator", "hr_admin");
+const LAB_ORDER = requireRole("physician", "system_administrator", "hr_admin");
+const LAB_RESULTS = requireRole("lab_technician", "physician", "system_administrator", "hr_admin");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -24,12 +29,12 @@ async function embedItems(order) {
   return { ...order, items: items.rows };
 }
 
-router.get("/lab-test-catalog", asyncHandler(async (req, res) => {
+router.get("/lab-test-catalog", LAB_READ, asyncHandler(async (req, res) => {
   const result = await query(`SELECT * FROM lab_test_catalog ORDER BY panel, display_name;`);
   res.json(result.rows);
 }));
 
-router.get("/lab-orders", asyncHandler(async (req, res) => {
+router.get("/lab-orders", LAB_READ, asyncHandler(async (req, res) => {
   const { search, status, visit_id } = req.query;
   const conditions = [];
   const params = [];
@@ -61,13 +66,13 @@ router.get("/lab-orders", asyncHandler(async (req, res) => {
   res.json(withItems);
 }));
 
-router.get("/lab-orders/:id", asyncHandler(async (req, res) => {
+router.get("/lab-orders/:id", LAB_READ, asyncHandler(async (req, res) => {
   const result = await query(`SELECT * FROM lab_orders WHERE id = $1;`, [req.params.id]);
   if (!result.rows[0]) throw new ApiError(404, "lab_order_not_found", "Lab order not found.");
   res.json(await embedItems(result.rows[0]));
 }));
 
-router.post("/lab-orders", asyncHandler(async (req, res) => {
+router.post("/lab-orders", LAB_ORDER, asyncHandler(async (req, res) => {
   const { visit_id, physician_id, test_ids } = req.body;
   if (!visit_id) throw new ApiError(422, "visit_required", "A visit is required.");
   if (!Array.isArray(test_ids) || !test_ids.length) {
@@ -93,7 +98,7 @@ router.post("/lab-orders", asyncHandler(async (req, res) => {
   res.status(201).json(await embedItems(order));
 }));
 
-router.put("/lab-orders/:id", asyncHandler(async (req, res) => {
+router.put("/lab-orders/:id", LAB_RESULTS, asyncHandler(async (req, res) => {
   const current = await query(`SELECT * FROM lab_orders WHERE id = $1;`, [req.params.id]);
   const order = current.rows[0];
   if (!order) throw new ApiError(404, "lab_order_not_found", "Lab order not found.");
@@ -127,7 +132,7 @@ router.put("/lab-orders/:id", asyncHandler(async (req, res) => {
   res.json(await embedItems(result.rows[0]));
 }));
 
-router.put("/lab-orders/:orderId/items/:itemId", asyncHandler(async (req, res) => {
+router.put("/lab-orders/:orderId/items/:itemId", LAB_RESULTS, asyncHandler(async (req, res) => {
   const { result_value } = req.body;
   const result = await query(
     `UPDATE lab_order_items

@@ -2,10 +2,12 @@ const express = require("express");
 const { query, withTransaction } = require("../db/pool");
 const asyncHandler = require("../utils/asyncHandler");
 const requireAuth = require("../middleware/requireAuth");
+const requireRole = require("../middleware/requireRole");
 const { ApiError } = require("../middleware/errorHandler");
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(requireRole("receptionist", "physician", "system_administrator", "hr_admin"));
 
 router.get("/registrations", asyncHandler(async (req, res) => {
   const { search, status } = req.query;

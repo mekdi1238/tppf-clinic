@@ -2,8 +2,11 @@ const express = require("express");
 const { query } = require("../db/pool");
 const asyncHandler = require("../utils/asyncHandler");
 const requireAuth = require("../middleware/requireAuth");
+const requireRole = require("../middleware/requireRole");
 const { ApiError } = require("../middleware/errorHandler");
 const { hashPassword, verifyPassword } = require("../auth/passwordHash");
+
+const ADMIN_ONLY = requireRole("system_administrator", "hr_admin");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -24,12 +27,12 @@ async function setUserRoles(userId, roleIds) {
   }
 }
 
-router.get("/roles", asyncHandler(async (req, res) => {
+router.get("/roles", ADMIN_ONLY, asyncHandler(async (req, res) => {
   const result = await query(`SELECT * FROM roles ORDER BY display_name;`);
   res.json(result.rows);
 }));
 
-router.get("/users", asyncHandler(async (req, res) => {
+router.get("/users", ADMIN_ONLY, asyncHandler(async (req, res) => {
   const { search, status } = req.query;
   const conditions = [];
   const params = [];
@@ -47,7 +50,7 @@ router.get("/users", asyncHandler(async (req, res) => {
   res.json(withRoles);
 }));
 
-router.post("/users", asyncHandler(async (req, res) => {
+router.post("/users", ADMIN_ONLY, asyncHandler(async (req, res) => {
   const { username, password, full_name, physician_id, role_ids } = req.body;
   if (!username || !username.trim()) throw new ApiError(422, "username_required", "Username is required.");
   if (!password || password.length < 6) throw new ApiError(422, "password_too_short", "Password must be at least 6 characters.");
@@ -66,7 +69,7 @@ router.post("/users", asyncHandler(async (req, res) => {
   res.status(201).json(await embedRoles(result.rows[0]));
 }));
 
-router.put("/users/:id", asyncHandler(async (req, res) => {
+router.put("/users/:id", ADMIN_ONLY, asyncHandler(async (req, res) => {
   const current = await query(`SELECT * FROM users WHERE id = $1;`, [req.params.id]);
   const user = current.rows[0];
   if (!user) throw new ApiError(404, "user_not_found", "User not found.");
@@ -98,7 +101,7 @@ router.put("/users/:id", asyncHandler(async (req, res) => {
   res.json(await embedRoles(result.rows[0]));
 }));
 
-router.post("/users/:id/reset-password", asyncHandler(async (req, res) => {
+router.post("/users/:id/reset-password", ADMIN_ONLY, asyncHandler(async (req, res) => {
   const { password } = req.body;
   if (!password || password.length < 6) throw new ApiError(422, "password_too_short", "Password must be at least 6 characters.");
 
@@ -109,6 +112,9 @@ router.post("/users/:id/reset-password", asyncHandler(async (req, res) => {
 }));
 
 router.post("/users/:id/change-password", asyncHandler(async (req, res) => {
+  if (String(req.user.id) !== String(req.params.id)) {
+    throw new ApiError(403, "forbidden", "You can only change your own password.");
+  }
   const { current_password, new_password } = req.body;
   if (!new_password || new_password.length < 6) {
     throw new ApiError(422, "password_too_short", "New password must be at least 6 characters.");

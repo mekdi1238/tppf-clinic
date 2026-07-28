@@ -2,12 +2,16 @@ const express = require("express");
 const { query } = require("../db/pool");
 const asyncHandler = require("../utils/asyncHandler");
 const requireAuth = require("../middleware/requireAuth");
+const requireRole = require("../middleware/requireRole");
 const { ApiError } = require("../middleware/errorHandler");
+
+const CLINICAL_READ = requireRole("receptionist", "physician", "lab_technician", "pharmacist", "system_administrator", "hr_admin");
+const CLINICAL_WRITE = requireRole("receptionist", "physician", "system_administrator", "hr_admin");
 
 const router = express.Router();
 router.use(requireAuth);
 
-router.get("/patients", asyncHandler(async (req, res) => {
+router.get("/patients", CLINICAL_READ, asyncHandler(async (req, res) => {
   const { search, status } = req.query;
   const conditions = [];
   const params = [];
@@ -29,7 +33,7 @@ router.get("/patients", asyncHandler(async (req, res) => {
   res.json(result.rows);
 }));
 
-router.get("/patients/:id", asyncHandler(async (req, res) => {
+router.get("/patients/:id", CLINICAL_READ, asyncHandler(async (req, res) => {
   const patientResult = await query(`SELECT * FROM patients WHERE id = $1;`, [req.params.id]);
   const patient = patientResult.rows[0];
   if (!patient) throw new ApiError(404, "patient_not_found", "Patient not found.");
@@ -42,7 +46,7 @@ router.get("/patients/:id", asyncHandler(async (req, res) => {
   res.json({ ...patient, visits: visitsResult.rows });
 }));
 
-router.post("/patients", asyncHandler(async (req, res) => {
+router.post("/patients", CLINICAL_WRITE, asyncHandler(async (req, res) => {
   const { full_name, date_of_birth, gender, location, address, phone, photo_url } = req.body;
   if (!full_name || !full_name.trim()) {
     throw new ApiError(422, "full_name_required", "Full name is required.");
@@ -57,7 +61,7 @@ router.post("/patients", asyncHandler(async (req, res) => {
   res.status(201).json(result.rows[0]);
 }));
 
-router.put("/patients/:id", asyncHandler(async (req, res) => {
+router.put("/patients/:id", CLINICAL_WRITE, asyncHandler(async (req, res) => {
   const editable = ["full_name", "date_of_birth", "gender", "location", "address", "phone", "photo_url", "is_active"];
   const updates = [];
   const params = [];

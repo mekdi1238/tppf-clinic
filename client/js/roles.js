@@ -19,17 +19,20 @@ const RoleGuard = (() => {
   };
 
   // Roles that give a user the full, unrestricted view regardless of
-  // what else they hold. Only back-office/admin roles get this —
-  // every clinical/front-desk role below is scoped to its own nav set.
-  const ELEVATED = ['system_administrator', 'hr_admin'];
+  // what else they hold. Only the system administrator gets this —
+  // every other role below is scoped to its own nav set.
+  const ELEVATED = ['system_administrator'];
 
   // Which nav item keys (see shell.js NAV_SECTIONS) each restricted
   // role is allowed to see. Anyone not listed here (or holding an
   // elevated role) sees the full nav, unfiltered.
   //
   // HR Reporting: restricted purely to viewing analytics & reports.
+  // HR/Admin: broad clinical visibility (employee health programs)
+  //           but NOT system tools like backup and settings.
   const NAV_VISIBILITY = {
     hr_reporting: ['reports'],
+    hr_admin: ['dashboard', 'patients', 'visits', 'admissions', 'employee-registrations', 'certifications', 'laboratory', 'pharmacy', 'referrals', 'reports', 'users'],
     lab_technician: ['dashboard', 'patients', 'laboratory'],
     pharmacist: ['dashboard', 'patients', 'pharmacy'],
     receptionist: ['dashboard', 'patients', 'visits', 'employee-registrations'],

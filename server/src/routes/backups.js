@@ -2,10 +2,12 @@ const express = require("express");
 const { query } = require("../db/pool");
 const asyncHandler = require("../utils/asyncHandler");
 const requireAuth = require("../middleware/requireAuth");
+const requireRole = require("../middleware/requireRole");
 const { ApiError } = require("../middleware/errorHandler");
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(requireRole("system_administrator"));
 
 router.get("/backups", asyncHandler(async (req, res) => {
   const result = await query(
