@@ -29,7 +29,8 @@
               <option value="pending">Pending</option>
               <option value="certified_fit">Certified Fit</option>
               <option value="certified_unfit">Certified Unfit</option>
-              <option value="hired">Hired</option>
+              <option value="hired">Hired (Patient)</option>
+              <option value="accepted_as_staff">Accepted as Staff</option>
               <option value="withdrawn">Withdrawn</option>
             </select>
           </div>
@@ -171,6 +172,67 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="cert-form-cancel">Cancel</button>
           <button type="submit" class="btn btn-primary" id="cert-form-submit">Save Exam Result</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Accept as Staff Modal -->
+  <div class="modal-backdrop" id="staff-modal-backdrop">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <div>
+          <h2>Accept as Clinic Staff</h2>
+          <p id="staff-modal-sub">Assign a department and position to this candidate.</p>
+        </div>
+        <button class="icon-btn" id="staff-modal-close"></button>
+      </div>
+      <form id="staff-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <input type="hidden" id="sf-registration-id" />
+
+            <div class="field span-2">
+              <label for="sf-department">Department</label>
+              <select id="sf-department" required>
+                <option value="">Select department…</option>
+                <option value="Medical">Medical</option>
+                <option value="Finance">Finance</option>
+                <option value="Human Resource Management">Human Resource Management</option>
+                <option value="Planning and Budget Service">Planning and Budget Service</option>
+                <option value="Product Quality Control Service">Product Quality Control Service</option>
+                <option value="Production and Technic">Production and Technic</option>
+                <option value="Property Management">Property Management</option>
+              </select>
+            </div>
+
+            <div class="field span-2">
+              <label for="sf-position">Position</label>
+              <select id="sf-position" required>
+                <option value="">Select department first…</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="sf-date-recruited">Date recruited</label>
+              <input type="date" id="sf-date-recruited" />
+            </div>
+
+            <!-- Medical-only fields -->
+            <div class="field" id="sf-license-field" style="display:none;">
+              <label for="sf-license-no">License No.</label>
+              <input type="text" id="sf-license-no" placeholder="e.g. ML-2201" />
+            </div>
+            <div class="field span-2" id="sf-qualification-field" style="display:none;">
+              <label for="sf-qualification">Qualification</label>
+              <input type="text" id="sf-qualification" placeholder="e.g. General Practitioner, MD" />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <span class="footer-note" id="staff-form-note">A clinic staff code (CI001) will be assigned automatically.</span>
+          <button type="button" class="btn btn-secondary" id="staff-form-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="staff-form-submit">Accept as Staff</button>
         </div>
       </form>
     </div>

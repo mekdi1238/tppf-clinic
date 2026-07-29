@@ -84,13 +84,15 @@ const UI = (() => {
     certified_fit: 'badge-success',
     certified_unfit: 'badge-danger',
     hired: 'badge-primary',
+    accepted_as_staff: 'badge-primary',
     withdrawn: 'badge-neutral',
   };
   const REGISTRATION_STATUS_LABEL = {
     pending: 'Pending',
     certified_fit: 'Certified Fit',
     certified_unfit: 'Certified Unfit',
-    hired: 'Hired',
+    hired: 'Hired (Patient)',
+    accepted_as_staff: 'Accepted as Staff',
     withdrawn: 'Withdrawn',
   };
   function registrationStatusBadge(status) {

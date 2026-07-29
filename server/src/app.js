@@ -15,6 +15,7 @@ const referralsRoutes = require("./routes/referralsAndSickLeaves");
 const usersRoutes = require("./routes/users");
 const settingsRoutes = require("./routes/settings");
 const backupsRoutes = require("./routes/backups");
+const staffRoutes = require("./routes/staff");
 const notFound = require("./middleware/notFound");
 const { errorHandler } = require("./middleware/errorHandler");
 
@@ -40,6 +41,7 @@ function createApp() {
   app.use("/api/v1", pharmacyRoutes);
   app.use("/api/v1", referralsRoutes);
   app.use("/api/v1", usersRoutes);
+  app.use("/api/v1", staffRoutes);
   app.use("/api/v1", settingsRoutes);
   app.use("/api/v1", backupsRoutes);
 

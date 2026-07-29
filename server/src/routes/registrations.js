@@ -9,6 +9,9 @@ const router = express.Router();
 router.use(requireAuth);
 router.use(requireRole("receptionist", "physician", "system_administrator", "hr_admin"));
 
+// Only hr_admin and physician can accept a candidate as staff
+const ACCEPT_AS_STAFF_ROLES = requireRole("hr_admin", "physician", "system_administrator");
+
 router.get("/registrations", asyncHandler(async (req, res) => {
   const { search, status } = req.query;
   const conditions = [];
@@ -52,10 +55,16 @@ router.get("/registrations/:id", asyncHandler(async (req, res) => {
     [req.params.id]
   );
 
+  const hiredStaffResult = await query(
+    `SELECT * FROM clinic_staff WHERE source_employee_registration_id = $1;`,
+    [req.params.id]
+  );
+
   res.json({
     ...registration,
     certifications: certsResult.rows,
     hired_patient: hiredPatientResult.rows[0] || null,
+    hired_staff: hiredStaffResult.rows[0] || null,
   });
 }));
 
@@ -134,6 +143,69 @@ router.post("/registrations/:id/hire", asyncHandler(async (req, res) => {
   });
 
   res.json(hired);
+}));
+
+// POST /registrations/:id/accept-as-staff
+// Restricted to hr_admin and physician roles.
+// Converts a certified_fit candidate into a clinic staff member (CI-series).
+router.post("/registrations/:id/accept-as-staff", ACCEPT_AS_STAFF_ROLES, asyncHandler(async (req, res) => {
+  const regResult = await query(`SELECT * FROM employee_registrations WHERE id = $1;`, [req.params.id]);
+  const registration = regResult.rows[0];
+  if (!registration) throw new ApiError(404, "registration_not_found", "Registration not found.");
+  if (registration.status !== "certified_fit") {
+    throw new ApiError(422, "not_certified_fit", "Only candidates certified as fit can be accepted as staff.");
+  }
+
+  // Guard: already converted?
+  const existingStaff = await query(
+    `SELECT id, staff_code FROM clinic_staff WHERE source_employee_registration_id = $1;`,
+    [req.params.id]
+  );
+  if (existingStaff.rows[0]) {
+    throw new ApiError(
+      422,
+      "already_accepted_as_staff",
+      `This candidate was already accepted as staff (${existingStaff.rows[0].staff_code}).`
+    );
+  }
+
+  const { department, position, date_recruited, license_no, qualification } = req.body;
+  if (!department || !department.trim()) throw new ApiError(422, "department_required", "Department is required.");
+  if (!position || !position.trim()) throw new ApiError(422, "position_required", "Position is required.");
+
+  const result = await withTransaction(async (client) => {
+    const staffResult = await client.query(
+      `INSERT INTO clinic_staff
+         (staff_code, full_name, gender, date_of_birth, department, position,
+          date_recruited, license_no, qualification,
+          source_employee_registration_id, accepted_by_user_id)
+       VALUES
+         ('CI' || lpad(nextval('staff_code_seq')::text, 3, '0'),
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING *;`,
+      [
+        registration.full_name,
+        registration.gender || null,
+        registration.date_of_birth || null,
+        department.trim(),
+        position.trim(),
+        date_recruited || null,
+        license_no || null,
+        qualification || null,
+        registration.id,
+        req.user.id,
+      ]
+    );
+
+    const updatedRegResult = await client.query(
+      `UPDATE employee_registrations SET status = 'accepted_as_staff' WHERE id = $1 RETURNING *;`,
+      [registration.id]
+    );
+
+    return { staff: staffResult.rows[0], registration: updatedRegResult.rows[0] };
+  });
+
+  res.status(201).json(result);
 }));
 
 module.exports = router;

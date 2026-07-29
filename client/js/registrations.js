@@ -15,10 +15,70 @@ document.getElementById('plus-icon-slot').innerHTML = Icons.render('plus');
 document.getElementById('reg-modal-close').innerHTML = Icons.render('close');
 document.getElementById('reg-detail-close').innerHTML = Icons.render('close');
 document.getElementById('cert-modal-close').innerHTML = Icons.render('close');
+document.getElementById('staff-modal-close').innerHTML = Icons.render('close');
 
 let currentList = [];
 let physiciansCache = [];
 let editingRegId = null;
+
+// Role check: only hr_admin and physician can accept candidates as staff
+const canAcceptAsStaff = RoleGuard.has('hr_admin') || RoleGuard.has('physician') || RoleGuard.has('system_administrator');
+
+// ---------- Department → Position map ----------
+// Positions are placeholders; update with your final list when ready.
+const DEPARTMENT_POSITIONS = {
+  'Medical': [
+    'Physician (General)',
+    'Specialist Physician',
+    'Lab Technician',
+    'Pharmacist',
+    'Nurse',
+    'Radiologist',
+    'Medical Officer',
+  ],
+  'Finance': [
+    'Finance Officer',
+    'Accountant',
+    'Senior Accountant',
+    'Finance Manager',
+    'Budget Officer',
+  ],
+  'Human Resource Management': [
+    'HR Manager',
+    'HR Officer',
+    'HR Administrator',
+    // Safety and Security sub-unit
+    'Safety Officer',
+    'Security Officer',
+    'Security Guard',
+    'Safety and Security Supervisor',
+  ],
+  'Planning and Budget Service': [
+    'Planning Officer',
+    'Budget Analyst',
+    'Planning Manager',
+    'Budget Planning Coordinator',
+  ],
+  'Product Quality Control Service': [
+    'Quality Control Inspector',
+    'QC Supervisor',
+    'Quality Assurance Officer',
+    'QC Manager',
+  ],
+  'Production and Technic': [
+    'Technician',
+    'Machine Operator',
+    'Production Supervisor',
+    'Senior Technician',
+    'Maintenance Engineer',
+  ],
+  'Property Management': [
+    'Property Officer',
+    'Facility Manager',
+    'Property Supervisor',
+    'Maintenance Officer',
+  ],
+};
 
 function debounce(fn, ms) {
   let t;
@@ -206,7 +266,12 @@ function renderRegDetail(r) {
       ${r.hired_patient ? `
         <div class="notice notice-info" style="margin-top:14px;">
           ${Icons.render('check')}
-          <span>Hired — now patient <strong>${r.hired_patient.patient_code}</strong>. <a href="patients.html?open=${r.hired_patient.id}" style="text-decoration:underline;">View patient record</a>.</span>
+          <span>Hired as patient — <strong>${r.hired_patient.patient_code}</strong>. <a href="patients.html?open=${r.hired_patient.id}" style="text-decoration:underline;">View patient record</a>.</span>
+        </div>` : ''}
+      ${r.hired_staff ? `
+        <div class="notice notice-info" style="margin-top:14px;">
+          ${Icons.render('employees')}
+          <span>Accepted as clinic staff — <strong>${r.hired_staff.staff_code}</strong> &middot; ${UI.escapeHtml(r.hired_staff.position)}, ${UI.escapeHtml(r.hired_staff.department)}.</span>
         </div>` : ''}
     </div>
     <div class="detail-section">
@@ -229,23 +294,26 @@ function renderRegDetail(r) {
 
   const footer = document.getElementById('reg-detail-footer');
   const canCertify = CERTIFIABLE_STATUSES_CLIENT.includes(r.status) && !isReceptionist;
-  const canWithdraw = r.status !== 'hired' && r.status !== 'withdrawn';
+  const canWithdraw = r.status !== 'hired' && r.status !== 'withdrawn' && r.status !== 'accepted_as_staff';
   const canHire = r.status === 'certified_fit' && !isReceptionist;
-  const canEdit = r.status !== 'hired';
+  const canEdit = r.status !== 'hired' && r.status !== 'accepted_as_staff';
+  const canConvertToStaff = r.status === 'certified_fit' && canAcceptAsStaff && !r.hired_staff;
 
   footer.innerHTML = `
     <span class="footer-note"></span>
     ${canEdit ? `<button class="btn btn-secondary" id="rd-edit-btn">Edit</button>` : ''}
     ${canWithdraw ? `<button class="btn btn-secondary" id="rd-withdraw-btn">Withdraw</button>` : ''}
     ${canCertify ? `<button class="btn btn-secondary" id="rd-certify-btn">Record Certification</button>` : ''}
-    ${canHire ? `<button class="btn btn-primary" id="rd-hire-btn">Hire Candidate</button>` : ''}
-    ${!canCertify && !canHire && !canWithdraw && !canEdit ? `<span class="footer-note">This record is closed to further changes.</span>` : ''}
+    ${canConvertToStaff ? `<button class="btn btn-secondary" id="rd-staff-btn">${Icons.render('employees')} Accept as Staff</button>` : ''}
+    ${canHire ? `<button class="btn btn-primary" id="rd-hire-btn">Hire as Patient</button>` : ''}
+    ${!canCertify && !canHire && !canWithdraw && !canEdit && !canConvertToStaff ? `<span class="footer-note">This record is closed to further changes.</span>` : ''}
   `;
 
   if (canEdit) document.getElementById('rd-edit-btn').addEventListener('click', () => { closeRegDetail(); openRegForm(r.id); });
   if (canWithdraw) document.getElementById('rd-withdraw-btn').addEventListener('click', (e) => withdrawRegistration(r.id, e.currentTarget));
   if (canCertify) document.getElementById('rd-certify-btn').addEventListener('click', () => openCertForm(r));
   if (canHire) document.getElementById('rd-hire-btn').addEventListener('click', (e) => hireCandidate(r.id, e.currentTarget));
+  if (canConvertToStaff) document.getElementById('rd-staff-btn').addEventListener('click', () => openAcceptAsStaffForm(r));
 }
 
 const CERTIFIABLE_STATUSES_CLIENT = ['pending', 'certified_fit', 'certified_unfit'];
@@ -283,6 +351,86 @@ async function hireCandidate(id, btn) {
     btn.textContent = originalLabel;
   }
 }
+
+// ---------- Accept as Staff modal ----------
+function openAcceptAsStaffForm(registration) {
+  document.getElementById('staff-form').reset();
+  document.getElementById('sf-registration-id').value = registration.id;
+  document.getElementById('staff-modal-sub').textContent =
+    `Assign a clinic staff role for ${registration.full_name} (${registration.registration_code}).`;
+
+  // Reset position dropdown and medical-only fields
+  document.getElementById('sf-position').innerHTML = '<option value="">Select department first…</option>';
+  document.getElementById('sf-license-field').style.display = 'none';
+  document.getElementById('sf-qualification-field').style.display = 'none';
+
+  // Default date recruited to today
+  document.getElementById('sf-date-recruited').value = new Date().toISOString().slice(0, 10);
+
+  closeRegDetail();
+  document.getElementById('staff-modal-backdrop').classList.add('visible');
+}
+
+function closeStaffForm() {
+  document.getElementById('staff-modal-backdrop').classList.remove('visible');
+}
+
+document.getElementById('staff-modal-close').addEventListener('click', closeStaffForm);
+document.getElementById('staff-form-cancel').addEventListener('click', closeStaffForm);
+document.getElementById('staff-modal-backdrop').addEventListener('click', (e) => {
+  if (e.target.id === 'staff-modal-backdrop') closeStaffForm();
+});
+
+// Cascade: when department changes, repopulate the position dropdown
+// and toggle medical-only fields
+document.getElementById('sf-department').addEventListener('change', () => {
+  const dept = document.getElementById('sf-department').value;
+  const positions = DEPARTMENT_POSITIONS[dept] || [];
+  const posSelect = document.getElementById('sf-position');
+  posSelect.innerHTML = positions.length
+    ? '<option value="">Select position…</option>' +
+      positions.map(p => `<option value="${p}">${p}</option>`).join('')
+    : '<option value="">No positions defined yet</option>';
+
+  const isMedical = dept === 'Medical';
+  document.getElementById('sf-license-field').style.display = isMedical ? '' : 'none';
+  document.getElementById('sf-qualification-field').style.display = isMedical ? '' : 'none';
+});
+
+document.getElementById('staff-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const dept = document.getElementById('sf-department').value;
+  const position = document.getElementById('sf-position').value;
+  if (!dept || !position) {
+    UI.toast('Please select a department and a position.', 'danger');
+    return;
+  }
+
+  const payload = {
+    department: dept,
+    position,
+    date_recruited: document.getElementById('sf-date-recruited').value || null,
+    license_no: document.getElementById('sf-license-no').value.trim() || null,
+    qualification: document.getElementById('sf-qualification').value.trim() || null,
+  };
+
+  const registrationId = document.getElementById('sf-registration-id').value;
+  const btn = document.getElementById('staff-form-submit');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Saving…';
+
+  try {
+    const result = await Api.registrations.acceptAsStaff(registrationId, payload);
+    UI.toast(`${result.staff.full_name} is now clinic staff — ${result.staff.staff_code} (${result.staff.position}, ${result.staff.department}).`);
+    closeStaffForm();
+    loadRegistrations();
+  } catch (err) {
+    UI.toast(UI.errorMessage(err), 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Accept as Staff';
+  }
+});
 
 function closeRegDetail() {
   document.getElementById('reg-detail-backdrop').classList.remove('visible');
