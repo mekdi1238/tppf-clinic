@@ -83,6 +83,25 @@
               <label for="rf-occupation">Occupation applied for</label>
               <input type="text" id="rf-occupation" required />
             </div>
+            <div class="field span-2">
+              <label for="rf-department">Department</label>
+              <select id="rf-department" required>
+                <option value="">Select department…</option>
+                <option value="Medical">Medical</option>
+                <option value="Finance">Finance</option>
+                <option value="Human Resource Management">Human Resource Management</option>
+                <option value="Planning and Budget Service">Planning and Budget Service</option>
+                <option value="Product Quality Control Service">Product Quality Control Service</option>
+                <option value="Production and Technic">Production and Technic</option>
+                <option value="Property Management">Property Management</option>
+              </select>
+            </div>
+            <div class="field span-2">
+              <label for="rf-position">Position</label>
+              <select id="rf-position" required>
+                <option value="">Select department first…</option>
+              </select>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -192,27 +211,6 @@
           <div class="form-grid">
             <input type="hidden" id="sf-registration-id" />
 
-            <div class="field span-2">
-              <label for="sf-department">Department</label>
-              <select id="sf-department" required>
-                <option value="">Select department…</option>
-                <option value="Medical">Medical</option>
-                <option value="Finance">Finance</option>
-                <option value="Human Resource Management">Human Resource Management</option>
-                <option value="Planning and Budget Service">Planning and Budget Service</option>
-                <option value="Product Quality Control Service">Product Quality Control Service</option>
-                <option value="Production and Technic">Production and Technic</option>
-                <option value="Property Management">Property Management</option>
-              </select>
-            </div>
-
-            <div class="field span-2">
-              <label for="sf-position">Position</label>
-              <select id="sf-position" required>
-                <option value="">Select department first…</option>
-              </select>
-            </div>
-
             <div class="field">
               <label for="sf-date-recruited">Date recruited</label>
               <input type="date" id="sf-date-recruited" />
@@ -230,7 +228,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <span class="footer-note" id="staff-form-note">A clinic staff code (CI001) will be assigned automatically.</span>
+          <span class="footer-note" id="staff-form-note">A staff code will be assigned automatically based on the department.</span>
           <button type="button" class="btn btn-secondary" id="staff-form-cancel">Cancel</button>
           <button type="submit" class="btn btn-primary" id="staff-form-submit">Accept as Staff</button>
         </div>

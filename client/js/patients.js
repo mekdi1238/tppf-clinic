@@ -84,6 +84,7 @@ function renderTable(list) {
                 <div class="row-actions">
                   <button class="icon-btn" title="View" onclick="openPatientDetail('${p.id}')">${Icons.render('eye')}</button>
                   ${perms.edit ? `<button class="icon-btn" title="Edit" onclick="openPatientForm('${p.id}')">${Icons.render('edit')}</button>` : ''}
+                  ${(RoleGuard.has('hr_admin') || RoleGuard.has('system_administrator')) ? `<button class="icon-btn text-danger" style="color: #dc3545;" title="Delete" onclick="deletePatientList(event, '${p.id}')">${Icons.render('trash')}</button>` : ''}
                 </div>
               </td>
             </tr>
@@ -208,9 +209,62 @@ async function openPatientDetail(id) {
       renderFullPatientDetail(p);
     }
 
+    const isAdmin = RoleGuard.has('hr_admin') || RoleGuard.has('system_administrator');
+    const archiveBtn = document.getElementById('pd-archive-btn');
+    const deleteBtn = document.getElementById('pd-delete-btn');
+    
+    archiveBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+    archiveBtn.textContent = p.is_active ? 'Archive Patient' : 'Restore Patient';
+    deleteBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+
+    archiveBtn.onclick = async () => {
+      const isArchiving = p.is_active;
+      if (isArchiving && !confirm('Archive this patient? They will be hidden from active lists but their history remains.')) return;
+      if (!isArchiving && !confirm('Restore this patient?')) return;
+      
+      archiveBtn.disabled = true;
+      try {
+        await Api.patients.update(p.id, { is_active: !isArchiving });
+        UI.toast(isArchiving ? 'Patient archived.' : 'Patient restored.');
+        closePatientDetail();
+        loadPatients();
+      } catch (err) {
+        UI.toast(UI.errorMessage(err), 'danger');
+      } finally {
+        archiveBtn.disabled = false;
+      }
+    };
+
+    deleteBtn.onclick = async () => {
+      if (!confirm('HARD DELETE this patient? ALL their medical history, visits, prescriptions, and lab orders will be permanently erased. This cannot be undone!')) return;
+      deleteBtn.disabled = true;
+      try {
+        await Api.patients.delete(p.id);
+        UI.toast('Patient permanently deleted.');
+        closePatientDetail();
+        loadPatients();
+      } catch (err) {
+        UI.toast(UI.errorMessage(err), 'danger');
+      } finally {
+        deleteBtn.disabled = false;
+      }
+    };
+
     document.getElementById('patient-detail-backdrop').classList.add('visible');
   } catch (e) {
     UI.toast(UI.errorMessage(e), 'danger');
+  }
+}
+
+async function deletePatientList(e, id) {
+  e.stopPropagation();
+  if (!confirm('HARD DELETE this patient? ALL their medical history, visits, prescriptions, and lab orders will be permanently erased. This cannot be undone!')) return;
+  try {
+    await Api.patients.delete(id);
+    UI.toast('Patient permanently deleted.');
+    loadPatients();
+  } catch (err) {
+    UI.toast(UI.errorMessage(err), 'danger');
   }
 }
 

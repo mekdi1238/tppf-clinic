@@ -1157,6 +1157,7 @@ const Api = {
     get: (id) => apiRequest('GET', `/patients/${id}`),
     create: (data) => apiRequest('POST', '/patients', data),
     update: (id, data) => apiRequest('PUT', `/patients/${id}`, data),
+    delete: (id) => apiRequest('DELETE', `/patients/${id}`),
   },
   visits: {
     list: (params = {}) => apiRequest('GET', `/visits?${new URLSearchParams(params)}`),
@@ -1173,8 +1174,8 @@ const Api = {
     get: (id) => apiRequest('GET', `/registrations/${id}`),
     create: (data) => apiRequest('POST', '/registrations', data),
     update: (id, data) => apiRequest('PUT', `/registrations/${id}`, data),
-    hire: (id) => apiRequest('POST', `/registrations/${id}/hire`),
     acceptAsStaff: (id, data) => apiRequest('POST', `/registrations/${id}/accept-as-staff`, data),
+    delete: (id) => apiRequest('DELETE', `/registrations/${id}`),
   },
   certifications: {
     list: (params = {}) => apiRequest('GET', `/certifications?${new URLSearchParams(params)}`),

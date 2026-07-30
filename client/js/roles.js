@@ -32,7 +32,7 @@ const RoleGuard = (() => {
   //           but NOT system tools like backup and settings.
   const NAV_VISIBILITY = {
     hr_reporting: ['reports'],
-    hr_admin: ['dashboard', 'patients', 'visits', 'admissions', 'employee-registrations', 'certifications', 'laboratory', 'pharmacy', 'referrals', 'reports', 'users'],
+    hr_admin: ['dashboard', 'patients', 'visits', 'admissions', 'employee-registrations', 'certifications', 'laboratory', 'pharmacy', 'referrals', 'reports', 'archive', 'users'],
     lab_technician: ['dashboard', 'patients', 'laboratory'],
     pharmacist: ['dashboard', 'patients', 'pharmacy'],
     receptionist: ['dashboard', 'patients', 'visits', 'employee-registrations'],

@@ -36,6 +36,7 @@ const NAV_SECTIONS = [
     label: 'Administration',
     items: [
       { key: 'reports', label: 'Reports', icon: 'reports', href: 'reports.html', active: true },
+      { key: 'archive', label: 'Archive', icon: 'archive', href: 'archive.html', active: true },
       { key: 'users', label: 'Users & Roles', icon: 'users', href: 'users.html', active: true },
       { key: 'backup', label: 'Backup', icon: 'backup', href: 'backup.html', active: true },
       { key: 'settings', label: 'Settings', icon: 'settings', href: 'settings.html', active: true },

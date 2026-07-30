@@ -137,7 +137,12 @@ function renderTable(list) {
               <td class="cell-muted">${UI.escapeHtml(r.occupation)}</td>
               <td class="cell-muted">${UI.formatDate(r.registration_date)}</td>
               <td>${UI.registrationStatusBadge(r.status)}</td>
-              <td><button class="icon-btn" title="View" onclick="openRegDetail('${r.id}')">${Icons.render('eye')}</button></td>
+              <td>
+                <div class="row-actions">
+                  <button class="icon-btn" title="View" onclick="openRegDetail('${r.id}')">${Icons.render('eye')}</button>
+                  ${(RoleGuard.has('hr_admin') || RoleGuard.has('system_administrator')) ? `<button class="icon-btn text-danger" style="color: #dc3545;" title="Delete" onclick="deleteRegistrationList(event, '${r.id}')">${Icons.render('trash')}</button>` : ''}
+                </div>
+              </td>
             </tr>
           `).join('')}
         </tbody>
@@ -169,6 +174,9 @@ async function openRegForm(id = null) {
     document.getElementById('rf-gender').value = r.gender || '';
     document.getElementById('rf-location').value = r.location || '';
     document.getElementById('rf-occupation').value = r.occupation || '';
+    document.getElementById('rf-department').value = r.department || '';
+    document.getElementById('rf-department').dispatchEvent(new Event('change'));
+    document.getElementById('rf-position').value = r.position || '';
     initialPhoto = r.photo_url || '';
   } else {
     document.querySelector('#reg-modal-backdrop h2').textContent = 'New Registration';
@@ -210,6 +218,8 @@ document.getElementById('reg-form').addEventListener('submit', async (e) => {
     date_of_birth: document.getElementById('rf-dob').value || null,
     gender: document.getElementById('rf-gender').value || null,
     location: document.getElementById('rf-location').value.trim(),
+    department: document.getElementById('rf-department').value.trim(),
+    position: document.getElementById('rf-position').value.trim(),
     occupation: document.getElementById('rf-occupation').value.trim(),
     photo_url: photoInput ? photoInput.value : null,
   };
@@ -263,11 +273,7 @@ function renderRegDetail(r) {
         <div class="detail-item"><div class="k">Location</div><div class="v">${UI.escapeHtml(r.location) || '—'}</div></div>
         <div class="detail-item"><div class="k">Occupation applied for</div><div class="v">${UI.escapeHtml(r.occupation)}</div></div>
       </div>
-      ${r.hired_patient ? `
-        <div class="notice notice-info" style="margin-top:14px;">
-          ${Icons.render('check')}
-          <span>Hired as patient — <strong>${r.hired_patient.patient_code}</strong>. <a href="patients.html?open=${r.hired_patient.id}" style="text-decoration:underline;">View patient record</a>.</span>
-        </div>` : ''}
+
       ${r.hired_staff ? `
         <div class="notice notice-info" style="margin-top:14px;">
           ${Icons.render('employees')}
@@ -294,38 +300,41 @@ function renderRegDetail(r) {
 
   const footer = document.getElementById('reg-detail-footer');
   const canCertify = CERTIFIABLE_STATUSES_CLIENT.includes(r.status) && !isReceptionist;
-  const canWithdraw = r.status !== 'hired' && r.status !== 'withdrawn' && r.status !== 'accepted_as_staff';
-  const canHire = r.status === 'certified_fit' && !isReceptionist;
+  const isArchived = r.status === 'withdrawn';
+  const canWithdraw = (r.status !== 'hired' && r.status !== 'accepted_as_staff') || isArchived;
   const canEdit = r.status !== 'hired' && r.status !== 'accepted_as_staff';
   const canConvertToStaff = r.status === 'certified_fit' && canAcceptAsStaff && !r.hired_staff;
+  const isAdmin = RoleGuard.has('hr_admin') || RoleGuard.has('system_administrator');
 
   footer.innerHTML = `
     <span class="footer-note"></span>
     ${canEdit ? `<button class="btn btn-secondary" id="rd-edit-btn">Edit</button>` : ''}
-    ${canWithdraw ? `<button class="btn btn-secondary" id="rd-withdraw-btn">Withdraw</button>` : ''}
+    ${canWithdraw ? `<button class="btn btn-secondary" id="rd-withdraw-btn">${isArchived ? 'Restore' : 'Archive'}</button>` : ''}
+    ${isAdmin ? `<button class="btn btn-danger" id="rd-delete-btn" style="background-color: #dc3545; color: white;">Delete (Hard)</button>` : ''}
     ${canCertify ? `<button class="btn btn-secondary" id="rd-certify-btn">Record Certification</button>` : ''}
     ${canConvertToStaff ? `<button class="btn btn-secondary" id="rd-staff-btn">${Icons.render('employees')} Accept as Staff</button>` : ''}
-    ${canHire ? `<button class="btn btn-primary" id="rd-hire-btn">Hire as Patient</button>` : ''}
-    ${!canCertify && !canHire && !canWithdraw && !canEdit && !canConvertToStaff ? `<span class="footer-note">This record is closed to further changes.</span>` : ''}
+    ${!canCertify && !canWithdraw && !canEdit && !canConvertToStaff && !isAdmin ? `<span class="footer-note">This record is closed to further changes.</span>` : ''}
   `;
 
   if (canEdit) document.getElementById('rd-edit-btn').addEventListener('click', () => { closeRegDetail(); openRegForm(r.id); });
   if (canWithdraw) document.getElementById('rd-withdraw-btn').addEventListener('click', (e) => withdrawRegistration(r.id, e.currentTarget));
+  if (isAdmin) document.getElementById('rd-delete-btn').addEventListener('click', (e) => deleteRegistration(r.id, e.currentTarget));
   if (canCertify) document.getElementById('rd-certify-btn').addEventListener('click', () => openCertForm(r));
-  if (canHire) document.getElementById('rd-hire-btn').addEventListener('click', (e) => hireCandidate(r.id, e.currentTarget));
   if (canConvertToStaff) document.getElementById('rd-staff-btn').addEventListener('click', () => openAcceptAsStaffForm(r));
 }
 
 const CERTIFIABLE_STATUSES_CLIENT = ['pending', 'certified_fit', 'certified_unfit'];
 
 async function withdrawRegistration(id, btn) {
-  if (!confirm('Withdraw this candidate\'s registration? This can be reversed by an admin later, but the candidate will no longer be eligible for certification or hiring.')) return;
+  const isRestoring = btn.textContent.trim() === 'Restore';
+  if (!isRestoring && !confirm('Archive this candidate\'s registration? They will be hidden but can be restored later.')) return;
+  if (isRestoring && !confirm('Restore this registration?')) return;
   const originalLabel = btn.textContent;
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Withdrawing…';
+  btn.innerHTML = '<span class="spinner"></span> Processing…';
   try {
-    await Api.registrations.update(id, { status: 'withdrawn' });
-    UI.toast('Registration withdrawn.');
+    await Api.registrations.update(id, { status: isRestoring ? 'pending' : 'withdrawn' });
+    UI.toast(isRestoring ? 'Registration restored.' : 'Registration archived.');
     closeRegDetail();
     loadRegistrations();
   } catch (e) {
@@ -335,14 +344,26 @@ async function withdrawRegistration(id, btn) {
   }
 }
 
-async function hireCandidate(id, btn) {
-  if (!confirm('Hire this candidate? This creates a new patient record and permanently moves the registration to "hired".')) return;
+async function deleteRegistrationList(e, id) {
+  e.stopPropagation();
+  if (!confirm('HARD DELETE this registration? ALL medical exams and staff accounts linked to this candidate will be permanently erased. This cannot be undone!')) return;
+  try {
+    await Api.registrations.delete(id);
+    UI.toast('Registration permanently deleted.');
+    loadRegistrations();
+  } catch (err) {
+    UI.toast(UI.errorMessage(err), 'danger');
+  }
+}
+
+async function deleteRegistration(id, btn) {
+  if (!confirm('HARD DELETE this registration? ALL medical exams and staff accounts linked to this candidate will be permanently erased. This cannot be undone!')) return;
   const originalLabel = btn.textContent;
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Hiring…';
+  btn.innerHTML = '<span class="spinner"></span> Deleting…';
   try {
-    const result = await Api.registrations.hire(id);
-    UI.toast(`Hired — new patient record ${result.patient.patient_code} created.`);
+    await Api.registrations.delete(id);
+    UI.toast('Registration permanently deleted.');
     closeRegDetail();
     loadRegistrations();
   } catch (e) {
@@ -351,6 +372,8 @@ async function hireCandidate(id, btn) {
     btn.textContent = originalLabel;
   }
 }
+
+
 
 // ---------- Accept as Staff modal ----------
 function openAcceptAsStaffForm(registration) {
@@ -359,13 +382,12 @@ function openAcceptAsStaffForm(registration) {
   document.getElementById('staff-modal-sub').textContent =
     `Assign a clinic staff role for ${registration.full_name} (${registration.registration_code}).`;
 
-  // Reset position dropdown and medical-only fields
-  document.getElementById('sf-position').innerHTML = '<option value="">Select department first…</option>';
-  document.getElementById('sf-license-field').style.display = 'none';
-  document.getElementById('sf-qualification-field').style.display = 'none';
-
   // Default date recruited to today
   document.getElementById('sf-date-recruited').value = new Date().toISOString().slice(0, 10);
+  
+  const isMedical = registration.department === 'Medical';
+  document.getElementById('sf-license-field').style.display = isMedical ? 'block' : 'none';
+  document.getElementById('sf-qualification-field').style.display = isMedical ? 'block' : 'none';
 
   closeRegDetail();
   document.getElementById('staff-modal-backdrop').classList.add('visible');
@@ -383,41 +405,34 @@ document.getElementById('staff-modal-backdrop').addEventListener('click', (e) =>
 
 // Cascade: when department changes, repopulate the position dropdown
 // and toggle medical-only fields
-document.getElementById('sf-department').addEventListener('change', () => {
-  const dept = document.getElementById('sf-department').value;
+document.getElementById('rf-department').addEventListener('change', (e) => {
+  const dept = e.target.value;
+  const posSelect = document.getElementById('rf-position');
+  if (!dept) {
+    posSelect.innerHTML = '<option value="">Select department first…</option>';
+    return;
+  }
   const positions = DEPARTMENT_POSITIONS[dept] || [];
-  const posSelect = document.getElementById('sf-position');
-  posSelect.innerHTML = positions.length
-    ? '<option value="">Select position…</option>' +
-      positions.map(p => `<option value="${p}">${p}</option>`).join('')
-    : '<option value="">No positions defined yet</option>';
+  posSelect.innerHTML = positions.map(p => `<option value="${p}">${p}</option>`).join('');
 
+  // Show medical fields only if it's the Medical department
   const isMedical = dept === 'Medical';
-  document.getElementById('sf-license-field').style.display = isMedical ? '' : 'none';
-  document.getElementById('sf-qualification-field').style.display = isMedical ? '' : 'none';
+  document.getElementById('sf-license-field').style.display = isMedical ? 'block' : 'none';
+  document.getElementById('sf-qualification-field').style.display = isMedical ? 'block' : 'none';
 });
 
 document.getElementById('staff-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const dept = document.getElementById('sf-department').value;
-  const position = document.getElementById('sf-position').value;
-  if (!dept || !position) {
-    UI.toast('Please select a department and a position.', 'danger');
-    return;
-  }
-
-  const payload = {
-    department: dept,
-    position,
-    date_recruited: document.getElementById('sf-date-recruited').value || null,
-    license_no: document.getElementById('sf-license-no').value.trim() || null,
-    qualification: document.getElementById('sf-qualification').value.trim() || null,
-  };
-
   const registrationId = document.getElementById('sf-registration-id').value;
   const btn = document.getElementById('staff-form-submit');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Saving…';
+
+  const payload = {
+    date_recruited: document.getElementById('sf-date-recruited').value || null,
+    license_no: document.getElementById('sf-license-no').value.trim() || null,
+    qualification: document.getElementById('sf-qualification').value.trim() || null,
+  };
 
   try {
     const result = await Api.registrations.acceptAsStaff(registrationId, payload);

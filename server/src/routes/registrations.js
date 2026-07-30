@@ -68,19 +68,25 @@ router.get("/registrations/:id", requireRole("receptionist", "physician", "syste
 }));
 
 router.post("/registrations", requireRole("receptionist", "physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
-  const { full_name, occupation, date_of_birth, gender, location, photo_url } = req.body;
+  const { full_name, occupation, date_of_birth, gender, location, photo_url, department, position } = req.body;
   if (!full_name || !full_name.trim()) {
     throw new ApiError(422, "full_name_required", "Full name is required.");
+  }
+  if (!department || !department.trim()) {
+    throw new ApiError(422, "department_required", "Department is required.");
+  }
+  if (!position || !position.trim()) {
+    throw new ApiError(422, "position_required", "Position is required.");
   }
   if (!occupation || !occupation.trim()) {
     throw new ApiError(422, "occupation_required", "Occupation applied for is required.");
   }
 
   const result = await query(
-    `INSERT INTO employee_registrations (registration_code, full_name, date_of_birth, gender, location, occupation, photo_url, status)
-     VALUES ('R' || lpad(nextval('registration_code_seq')::text, 3, '0'), $1, $2, $3, $4, $5, $6, 'pending')
+    `INSERT INTO employee_registrations (registration_code, full_name, date_of_birth, gender, location, occupation, photo_url, status, department, position)
+     VALUES ('R' || lpad(nextval('registration_code_seq')::text, 3, '0'), $1, $2, $3, $4, $5, $6, 'pending', $7, $8)
      RETURNING *;`,
-    [full_name.trim(), date_of_birth || null, gender || null, location || "", occupation.trim(), photo_url || null]
+    [full_name.trim(), date_of_birth || null, gender || null, location || "", occupation.trim(), photo_url || null, department.trim(), position.trim()]
   );
   res.status(201).json(result.rows[0]);
 }));
@@ -97,7 +103,7 @@ router.put("/registrations/:id", requireRole("receptionist", "physician", "syste
     );
   }
 
-  const editable = ["full_name", "date_of_birth", "gender", "location", "occupation", "photo_url", "status"];
+  const editable = ["full_name", "date_of_birth", "gender", "location", "occupation", "photo_url", "status", "department", "position"];
   const updates = [];
   const params = [];
   for (const key of editable) {
@@ -117,32 +123,7 @@ router.put("/registrations/:id", requireRole("receptionist", "physician", "syste
   res.json(result.rows[0]);
 }));
 
-router.post("/registrations/:id/hire", requireRole("receptionist", "physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
-  const regResult = await query(`SELECT * FROM employee_registrations WHERE id = $1;`, [req.params.id]);
-  const registration = regResult.rows[0];
-  if (!registration) throw new ApiError(404, "registration_not_found", "Registration not found.");
-  if (registration.status !== "certified_fit") {
-    throw new ApiError(422, "not_certified_fit", "Only candidates certified fit can be hired.");
-  }
 
-  const hired = await withTransaction(async (client) => {
-    const patientResult = await client.query(
-      `INSERT INTO patients (patient_code, full_name, date_of_birth, gender, location, address, phone, photo_url, source_employee_registration_id)
-       VALUES ('S' || lpad(nextval('patient_code_seq')::text, 3, '0'), $1, $2, $3, $4, '', '', $5, $6)
-       RETURNING *;`,
-      [registration.full_name, registration.date_of_birth, registration.gender, registration.location, registration.photo_url || null, registration.id]
-    );
-
-    const updatedRegResult = await client.query(
-      `UPDATE employee_registrations SET status = 'hired' WHERE id = $1 RETURNING *;`,
-      [registration.id]
-    );
-
-    return { patient: patientResult.rows[0], registration: updatedRegResult.rows[0] };
-  });
-
-  res.json(hired);
-}));
 
 // POST /registrations/:id/accept-as-staff
 // Restricted to hr_admin and physician roles.
@@ -168,9 +149,8 @@ router.post("/registrations/:id/accept-as-staff", requireRole("receptionist", "p
     );
   }
 
-  const { department, position, date_recruited, license_no, qualification } = req.body;
-  if (!department || !department.trim()) throw new ApiError(422, "department_required", "Department is required.");
-  if (!position || !position.trim()) throw new ApiError(422, "position_required", "Position is required.");
+  const { date_recruited, license_no, qualification } = req.body;
+  const prefix = registration.department === 'Medical' ? 'CI' : 'E';
 
   const result = await withTransaction(async (client) => {
     const staffResult = await client.query(
@@ -179,15 +159,16 @@ router.post("/registrations/:id/accept-as-staff", requireRole("receptionist", "p
           date_recruited, license_no, qualification,
           source_employee_registration_id, accepted_by_user_id)
        VALUES
-         ('CI' || lpad(nextval('staff_code_seq')::text, 3, '0'),
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         ($1 || lpad(nextval('staff_code_seq')::text, 3, '0'),
+          $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *;`,
       [
+        prefix,
         registration.full_name,
         registration.gender || null,
         registration.date_of_birth || null,
-        department.trim(),
-        position.trim(),
+        registration.department,
+        registration.position,
         date_recruited || null,
         license_no || null,
         qualification || null,
@@ -196,15 +177,28 @@ router.post("/registrations/:id/accept-as-staff", requireRole("receptionist", "p
       ]
     );
 
+    const patientResult = await client.query(
+      `INSERT INTO patients (patient_code, full_name, date_of_birth, gender, location, address, phone, photo_url, source_employee_registration_id)
+       VALUES ('S' || lpad(nextval('patient_code_seq')::text, 3, '0'), $1, $2, $3, $4, '', '', $5, $6)
+       RETURNING *;`,
+      [registration.full_name, registration.date_of_birth || null, registration.gender || null, registration.location || null, registration.photo_url || null, registration.id]
+    );
+
     const updatedRegResult = await client.query(
       `UPDATE employee_registrations SET status = 'accepted_as_staff' WHERE id = $1 RETURNING *;`,
       [registration.id]
     );
 
-    return { staff: staffResult.rows[0], registration: updatedRegResult.rows[0] };
+    return { staff: staffResult.rows[0], patient: patientResult.rows[0], registration: updatedRegResult.rows[0] };
   });
 
   res.status(201).json(result);
+}));
+
+router.delete("/registrations/:id", requireRole("system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
+  const result = await query(`DELETE FROM employee_registrations WHERE id = $1 RETURNING id;`, [req.params.id]);
+  if (!result.rows[0]) throw new ApiError(404, "registration_not_found", "Registration not found.");
+  res.json({ success: true, id: result.rows[0].id });
 }));
 
 module.exports = router;

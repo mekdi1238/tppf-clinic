@@ -88,4 +88,10 @@ router.put("/patients/:id", CLINICAL_WRITE, asyncHandler(async (req, res) => {
   res.json(result.rows[0]);
 }));
 
+router.delete("/patients/:id", requireRole("system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
+  const result = await query(`DELETE FROM patients WHERE id = $1 RETURNING id;`, [req.params.id]);
+  if (!result.rows[0]) throw new ApiError(404, "patient_not_found", "Patient not found.");
+  res.json({ success: true, id: result.rows[0].id });
+}));
+
 module.exports = router;
