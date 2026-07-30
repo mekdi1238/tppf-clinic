@@ -184,12 +184,27 @@ router.post("/registrations/:id/accept-as-staff", requireRole("receptionist", "p
       [registration.full_name, registration.date_of_birth || null, registration.gender || null, registration.location || null, registration.photo_url || null, registration.id]
     );
 
+    let physicianResult = null;
+    if (registration.department === 'Medical') {
+      physicianResult = await client.query(
+        `INSERT INTO physicians (full_name, gender, date_recruited, license_no, qualification, is_active, photo_url, source_employee_registration_id)
+         VALUES ($1, $2, $3, $4, $5, true, $6, $7)
+         RETURNING *;`,
+        [registration.full_name, registration.gender || null, date_recruited || null, license_no || null, qualification || null, registration.photo_url || null, registration.id]
+      );
+    }
+
     const updatedRegResult = await client.query(
       `UPDATE employee_registrations SET status = 'accepted_as_staff' WHERE id = $1 RETURNING *;`,
       [registration.id]
     );
 
-    return { staff: staffResult.rows[0], patient: patientResult.rows[0], registration: updatedRegResult.rows[0] };
+    return { 
+      staff: staffResult.rows[0], 
+      patient: patientResult.rows[0], 
+      registration: updatedRegResult.rows[0],
+      physician: physicianResult ? physicianResult.rows[0] : null
+    };
   });
 
   res.status(201).json(result);
