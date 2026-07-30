@@ -288,8 +288,22 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
             <div class="timeline-item">
               <div class="timeline-dot"></div>
               <div class="timeline-body">
-                <div class="t">${o.items.map(i => i.test ? UI.escapeHtml(i.test.code) : '?').join(', ')} ${UI.labOrderStatusBadge(o.status)}</div>
-                <div class="d">${UI.formatDateTime(o.order_date)}</div>
+                <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
+                  <div class="t" style="margin-bottom:0;">Order ${UI.labOrderStatusBadge(o.status)}</div>
+                  <div class="d">${UI.formatDateTime(o.order_date)}</div>
+                </div>
+                <div class="table-wrap" style="box-shadow:none; border:1px solid var(--color-border-subtle); border-radius:4px; padding:0;">
+                  <table class="data-table" style="font-size: 13px;">
+                    <tbody>
+                      ${o.items.map(i => `
+                        <tr>
+                          <td style="padding: 6px 12px; width:40%; color:var(--color-text-faint);">${i.test ? UI.escapeHtml(i.test.display_name) : '?'}</td>
+                          <td style="padding: 6px 12px; font-weight:500;">${i.result_value ? UI.escapeHtml(i.result_value) : '<span class="text-muted" style="font-style:italic;">Pending</span>'}</td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           `).join('')}

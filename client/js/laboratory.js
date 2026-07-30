@@ -209,7 +209,7 @@ function renderOrderDetail(o) {
               <tr>
                 <td class="cell-primary">${i.test ? UI.escapeHtml(i.test.display_name) : 'Unknown test'} <span class="cell-code">${i.test ? UI.escapeHtml(i.test.code) : ''}</span></td>
                 <td><input type="text" class="lab-result-input" data-item-id="${i.id}" value="${UI.escapeHtml(i.result_value) || ''}" placeholder="Enter result…" ${canEnter ? '' : 'disabled'} style="width:100%; border:1px solid var(--color-border-strong); border-radius:6px; padding:6px 9px; font-size:13px;" /></td>
-                <td>${canEnter ? `<button type="button" class="btn btn-secondary btn-sm" data-save-item="${i.id}">Save</button>` : (i.entered_at ? `<span class="text-muted" style="font-size:11.5px;">${UI.formatDateTime(i.entered_at)}</span>` : '')}</td>
+                <td id="lab-item-action-${i.id}">${canEnter ? `<button type="button" class="btn btn-secondary btn-sm" data-save-item="${i.id}">Save</button>` : (i.entered_at ? `<span class="text-muted" style="font-size:11.5px;">${UI.formatDateTime(i.entered_at)}</span>` : '')}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -226,10 +226,19 @@ function renderOrderDetail(o) {
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span>';
       try {
-        await Api.labOrders.updateItem(o.id, itemId, input.value.trim());
+        const updatedItem = await Api.labOrders.updateItem(o.id, itemId, input.value.trim());
         UI.toast('Result saved.');
-        const fresh = await Api.labOrders.get(o.id);
-        renderOrderDetail(fresh);
+        
+        // Update just this row to avoid wiping out other unsaved inputs in the modal
+        const actionCell = document.getElementById(`lab-item-action-${itemId}`);
+        if (actionCell && updatedItem.entered_at) {
+          actionCell.innerHTML = `<span class="text-muted" style="font-size:11.5px;">${UI.formatDateTime(updatedItem.entered_at)}</span>`;
+        } else {
+          btn.disabled = false;
+          btn.textContent = 'Save';
+        }
+        
+        // Still reload the list in the background so the table row is up to date
         loadOrders();
       } catch (e) {
         UI.toast(UI.errorMessage(e), 'danger');

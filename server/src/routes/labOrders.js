@@ -136,10 +136,16 @@ router.put("/lab-orders/:orderId/items/:itemId", LAB_RESULTS, asyncHandler(async
   const { result_value } = req.body;
   const result = await query(
     `UPDATE lab_order_items
-     SET result_value = $1, entered_by = $2, entered_at = CASE WHEN $1 IS NOT NULL THEN now() ELSE NULL END
+     SET result_value = $1, entered_by = $2, entered_at = $5
      WHERE id = $3 AND lab_order_id = $4
      RETURNING *;`,
-    [result_value || null, req.user ? req.user.id : null, req.params.itemId, req.params.orderId]
+    [
+      result_value || null, 
+      req.user ? req.user.id : null, 
+      req.params.itemId, 
+      req.params.orderId, 
+      (result_value || null) ? new Date() : null
+    ]
   );
   if (!result.rows[0]) throw new ApiError(404, "lab_order_item_not_found", "Lab order item not found.");
   res.json(result.rows[0]);
