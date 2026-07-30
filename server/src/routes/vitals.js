@@ -7,10 +7,9 @@ const { ApiError } = require("../middleware/errorHandler");
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireRole("receptionist", "physician", "system_administrator", "hr_admin"));
 
 // GET /visits/:id/vitals — list all vitals readings for a visit, newest first
-router.get("/visits/:id/vitals", asyncHandler(async (req, res) => {
+router.get("/visits/:id/vitals", requireRole("receptionist", "physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const visitResult = await query(`SELECT id FROM visits WHERE id = $1;`, [req.params.id]);
   if (!visitResult.rows[0]) throw new ApiError(404, "visit_not_found", "Visit not found.");
 
@@ -22,7 +21,7 @@ router.get("/visits/:id/vitals", asyncHandler(async (req, res) => {
 }));
 
 // POST /visits/:id/vitals — record a new vitals reading
-router.post("/visits/:id/vitals", asyncHandler(async (req, res) => {
+router.post("/visits/:id/vitals", requireRole("receptionist", "physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const visitResult = await query(`SELECT id FROM visits WHERE id = $1;`, [req.params.id]);
   if (!visitResult.rows[0]) throw new ApiError(404, "visit_not_found", "Visit not found.");
 

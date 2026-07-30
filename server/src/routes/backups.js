@@ -7,9 +7,8 @@ const { ApiError } = require("../middleware/errorHandler");
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireRole("system_administrator"));
 
-router.get("/backups", asyncHandler(async (req, res) => {
+router.get("/backups", requireRole("system_administrator"), asyncHandler(async (req, res) => {
   const result = await query(
     `SELECT b.*, u.full_name AS created_by_name
      FROM database_backups b
@@ -19,7 +18,7 @@ router.get("/backups", asyncHandler(async (req, res) => {
   res.json(result.rows);
 }));
 
-router.post("/backups", asyncHandler(async (req, res) => {
+router.post("/backups", requireRole("system_administrator"), asyncHandler(async (req, res) => {
   const label = req.body.label || "Manual Backup";
   const filename = `tppf_backup_${Date.now()}.sql`;
   const estimatedSize = Math.floor(Math.random() * 500000) + 150000;
@@ -34,7 +33,7 @@ router.post("/backups", asyncHandler(async (req, res) => {
   res.status(201).json(result.rows[0]);
 }));
 
-router.delete("/backups/:id", asyncHandler(async (req, res) => {
+router.delete("/backups/:id", requireRole("system_administrator"), asyncHandler(async (req, res) => {
   const result = await query(`DELETE FROM database_backups WHERE id = $1 RETURNING id;`, [req.params.id]);
   if (!result.rows[0]) throw new ApiError(404, "backup_not_found", "Backup record not found.");
   res.json({ ok: true, id: req.params.id });

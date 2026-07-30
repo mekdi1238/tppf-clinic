@@ -7,9 +7,8 @@ const { ApiError } = require("../middleware/errorHandler");
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireRole("physician", "system_administrator", "hr_admin"));
 
-router.get("/referrals", asyncHandler(async (req, res) => {
+router.get("/referrals", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const { search, visit_id } = req.query;
   const conditions = [];
   const params = [];
@@ -35,7 +34,7 @@ router.get("/referrals", asyncHandler(async (req, res) => {
   res.json(result.rows);
 }));
 
-router.get("/referrals/:id", asyncHandler(async (req, res) => {
+router.get("/referrals/:id", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const result = await query(
     `SELECT r.*, p.full_name AS patient_name, p.patient_code AS patient_code
      FROM referrals r
@@ -47,7 +46,7 @@ router.get("/referrals/:id", asyncHandler(async (req, res) => {
   res.json(result.rows[0]);
 }));
 
-router.post("/referrals", asyncHandler(async (req, res) => {
+router.post("/referrals", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const { visit_id, physician_id, diagnosis, reason, referred_to, note } = req.body;
   if (!visit_id) throw new ApiError(422, "visit_required", "A visit is required.");
   if (!referred_to || !referred_to.trim()) {
@@ -66,7 +65,7 @@ router.post("/referrals", asyncHandler(async (req, res) => {
   res.status(201).json(result.rows[0]);
 }));
 
-router.get("/sick-leaves", asyncHandler(async (req, res) => {
+router.get("/sick-leaves", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const { search, visit_id } = req.query;
   const conditions = [];
   const params = [];
@@ -92,7 +91,7 @@ router.get("/sick-leaves", asyncHandler(async (req, res) => {
   res.json(result.rows);
 }));
 
-router.get("/sick-leaves/:id", asyncHandler(async (req, res) => {
+router.get("/sick-leaves/:id", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const result = await query(
     `SELECT s.*, p.full_name AS patient_name, p.patient_code AS patient_code
      FROM sick_leaves s
@@ -104,7 +103,7 @@ router.get("/sick-leaves/:id", asyncHandler(async (req, res) => {
   res.json(result.rows[0]);
 }));
 
-router.post("/sick-leaves", asyncHandler(async (req, res) => {
+router.post("/sick-leaves", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const { visit_id, physician_id, diagnosis, exam_date, leave_start, leave_end } = req.body;
   if (!visit_id) throw new ApiError(422, "visit_required", "A visit is required.");
   if (!leave_start || !leave_end) throw new ApiError(422, "dates_required", "Enter both a start and end date.");

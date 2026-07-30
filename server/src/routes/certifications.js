@@ -7,11 +7,10 @@ const { ApiError } = require("../middleware/errorHandler");
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireRole("physician", "system_administrator", "hr_admin"));
 
 const CERTIFIABLE_STATUSES = ["pending", "certified_fit", "certified_unfit"];
 
-router.get("/certifications", asyncHandler(async (req, res) => {
+router.get("/certifications", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const { search, result } = req.query;
   const conditions = [];
   const params = [];
@@ -42,7 +41,7 @@ router.get("/certifications", asyncHandler(async (req, res) => {
   res.json(rows.rows);
 }));
 
-router.get("/certifications/:id", asyncHandler(async (req, res) => {
+router.get("/certifications/:id", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const result = await query(
     `SELECT c.*,
             row_to_json(r.*) AS registration,
@@ -57,7 +56,7 @@ router.get("/certifications/:id", asyncHandler(async (req, res) => {
   res.json(result.rows[0]);
 }));
 
-router.post("/certifications", asyncHandler(async (req, res) => {
+router.post("/certifications", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const {
     employee_registration_id, physician_id, result,
     physical_examination, personal_hygiene, skin_disease, stool_exam_direct,

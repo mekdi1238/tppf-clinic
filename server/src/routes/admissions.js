@@ -7,7 +7,6 @@ const { ApiError } = require("../middleware/errorHandler");
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireRole("physician", "system_administrator", "hr_admin"));
 
 async function embedAdmission(row) {
   const notes = await query(
@@ -17,7 +16,7 @@ async function embedAdmission(row) {
   return { ...row, notes: notes.rows };
 }
 
-router.get("/admissions", asyncHandler(async (req, res) => {
+router.get("/admissions", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const { search, status, visit_id } = req.query;
   const conditions = [];
   const params = [];
@@ -47,7 +46,7 @@ router.get("/admissions", asyncHandler(async (req, res) => {
   res.json(result.rows);
 }));
 
-router.get("/admissions/:id", asyncHandler(async (req, res) => {
+router.get("/admissions/:id", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const result = await query(
     `SELECT a.*, p.full_name AS patient_name, p.patient_code AS patient_code
      FROM admissions a
@@ -59,7 +58,7 @@ router.get("/admissions/:id", asyncHandler(async (req, res) => {
   res.json(await embedAdmission(result.rows[0]));
 }));
 
-router.post("/admissions", asyncHandler(async (req, res) => {
+router.post("/admissions", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const { visit_id, admitting_physician_id, reason } = req.body;
   if (!visit_id) throw new ApiError(422, "visit_required", "A visit is required.");
 
@@ -84,7 +83,7 @@ router.post("/admissions", asyncHandler(async (req, res) => {
   res.status(201).json(result.rows[0]);
 }));
 
-router.post("/admissions/:id/notes", asyncHandler(async (req, res) => {
+router.post("/admissions/:id/notes", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const { note } = req.body;
   if (!note || !note.trim()) throw new ApiError(422, "note_required", "Note text is required.");
 
@@ -100,7 +99,7 @@ router.post("/admissions/:id/notes", asyncHandler(async (req, res) => {
   res.status(201).json(result.rows[0]);
 }));
 
-router.post("/admissions/:id/discharge", asyncHandler(async (req, res) => {
+router.post("/admissions/:id/discharge", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const current = await query(`SELECT * FROM admissions WHERE id = $1;`, [req.params.id]);
   const admission = current.rows[0];
   if (!admission) throw new ApiError(404, "admission_not_found", "Admission not found.");

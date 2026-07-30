@@ -7,12 +7,11 @@ const { ApiError } = require("../middleware/errorHandler");
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireRole("receptionist", "physician", "system_administrator", "hr_admin"));
 
 // Only hr_admin and physician can accept a candidate as staff
 const ACCEPT_AS_STAFF_ROLES = requireRole("hr_admin", "physician", "system_administrator");
 
-router.get("/registrations", asyncHandler(async (req, res) => {
+router.get("/registrations", requireRole("receptionist", "physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const { search, status } = req.query;
   const conditions = [];
   const params = [];
@@ -36,7 +35,7 @@ router.get("/registrations", asyncHandler(async (req, res) => {
   res.json(result.rows);
 }));
 
-router.get("/registrations/:id", asyncHandler(async (req, res) => {
+router.get("/registrations/:id", requireRole("receptionist", "physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const regResult = await query(`SELECT * FROM employee_registrations WHERE id = $1;`, [req.params.id]);
   const registration = regResult.rows[0];
   if (!registration) throw new ApiError(404, "registration_not_found", "Registration not found.");
@@ -68,7 +67,7 @@ router.get("/registrations/:id", asyncHandler(async (req, res) => {
   });
 }));
 
-router.post("/registrations", asyncHandler(async (req, res) => {
+router.post("/registrations", requireRole("receptionist", "physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const { full_name, occupation, date_of_birth, gender, location, photo_url } = req.body;
   if (!full_name || !full_name.trim()) {
     throw new ApiError(422, "full_name_required", "Full name is required.");
@@ -86,7 +85,7 @@ router.post("/registrations", asyncHandler(async (req, res) => {
   res.status(201).json(result.rows[0]);
 }));
 
-router.put("/registrations/:id", asyncHandler(async (req, res) => {
+router.put("/registrations/:id", requireRole("receptionist", "physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const currentResult = await query(`SELECT * FROM employee_registrations WHERE id = $1;`, [req.params.id]);
   const current = currentResult.rows[0];
   if (!current) throw new ApiError(404, "registration_not_found", "Registration not found.");
@@ -118,7 +117,7 @@ router.put("/registrations/:id", asyncHandler(async (req, res) => {
   res.json(result.rows[0]);
 }));
 
-router.post("/registrations/:id/hire", asyncHandler(async (req, res) => {
+router.post("/registrations/:id/hire", requireRole("receptionist", "physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const regResult = await query(`SELECT * FROM employee_registrations WHERE id = $1;`, [req.params.id]);
   const registration = regResult.rows[0];
   if (!registration) throw new ApiError(404, "registration_not_found", "Registration not found.");
@@ -148,7 +147,7 @@ router.post("/registrations/:id/hire", asyncHandler(async (req, res) => {
 // POST /registrations/:id/accept-as-staff
 // Restricted to hr_admin and physician roles.
 // Converts a certified_fit candidate into a clinic staff member (CI-series).
-router.post("/registrations/:id/accept-as-staff", ACCEPT_AS_STAFF_ROLES, asyncHandler(async (req, res) => {
+router.post("/registrations/:id/accept-as-staff", requireRole("receptionist", "physician", "system_administrator", "hr_admin"), ACCEPT_AS_STAFF_ROLES, asyncHandler(async (req, res) => {
   const regResult = await query(`SELECT * FROM employee_registrations WHERE id = $1;`, [req.params.id]);
   const registration = regResult.rows[0];
   if (!registration) throw new ApiError(404, "registration_not_found", "Registration not found.");

@@ -7,7 +7,6 @@ const { ApiError } = require("../middleware/errorHandler");
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireRole("receptionist", "physician", "system_administrator", "hr_admin"));
 
 const VISIT_STATUS_TRANSITIONS = {
   open: ["examined"],
@@ -28,7 +27,7 @@ async function embedVisit(row) {
   };
 }
 
-router.get("/visits", asyncHandler(async (req, res) => {
+router.get("/visits", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "lab_technician", "pharmacist"), asyncHandler(async (req, res) => {
   const { status, search } = req.query;
   const conditions = [];
   const params = [];
@@ -59,14 +58,14 @@ router.get("/visits", asyncHandler(async (req, res) => {
   res.json(result.rows);
 }));
 
-router.get("/visits/:id", asyncHandler(async (req, res) => {
+router.get("/visits/:id", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "lab_technician", "pharmacist"), asyncHandler(async (req, res) => {
   const result = await query(`SELECT * FROM visits WHERE id = $1;`, [req.params.id]);
   const visit = result.rows[0];
   if (!visit) throw new ApiError(404, "visit_not_found", "Visit not found.");
   res.json(await embedVisit(visit));
 }));
 
-router.post("/visits", asyncHandler(async (req, res) => {
+router.post("/visits", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "lab_technician", "pharmacist"), asyncHandler(async (req, res) => {
   const { patient_id, physician_id, chief_complaint } = req.body;
   if (!patient_id || !physician_id) {
     throw new ApiError(422, "patient_and_physician_required", "Patient and physician are required.");
@@ -81,7 +80,7 @@ router.post("/visits", asyncHandler(async (req, res) => {
   res.status(201).json(result.rows[0]);
 }));
 
-router.put("/visits/:id", asyncHandler(async (req, res) => {
+router.put("/visits/:id", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "lab_technician", "pharmacist"), asyncHandler(async (req, res) => {
   const currentResult = await query(`SELECT * FROM visits WHERE id = $1;`, [req.params.id]);
   const current = currentResult.rows[0];
   if (!current) throw new ApiError(404, "visit_not_found", "Visit not found.");
