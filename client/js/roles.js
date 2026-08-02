@@ -31,12 +31,12 @@ const RoleGuard = (() => {
   // HR/Admin: broad clinical visibility (employee health programs)
   //           but NOT system tools like backup and settings.
   const NAV_VISIBILITY = {
-    hr_reporting: ['reports'],
-    hr_admin: ['dashboard', 'patients', 'visits', 'admissions', 'employee-registrations', 'certifications', 'laboratory', 'pharmacy', 'referrals', 'reports', 'archive', 'users'],
-    lab_technician: ['dashboard', 'patients', 'laboratory'],
-    pharmacist: ['dashboard', 'patients', 'pharmacy'],
-    receptionist: ['dashboard', 'patients', 'visits', 'employee-registrations'],
-    physician: ['dashboard', 'patients', 'visits', 'admissions', 'laboratory', 'pharmacy', 'referrals', 'employee-registrations', 'certifications'],
+    hr_reporting: ['reports', 'profile'],
+    hr_admin: ['dashboard', 'patients', 'visits', 'admissions', 'employee-registrations', 'certifications', 'laboratory', 'pharmacy', 'referrals', 'reports', 'archive', 'users', 'profile'],
+    lab_technician: ['dashboard', 'patients', 'laboratory', 'profile'],
+    pharmacist: ['dashboard', 'patients', 'pharmacy', 'profile'],
+    receptionist: ['dashboard', 'patients', 'visits', 'employee-registrations', 'profile'],
+    physician: ['dashboard', 'patients', 'visits', 'admissions', 'laboratory', 'pharmacy', 'referrals', 'employee-registrations', 'certifications', 'profile'],
   };
 
   function current() {

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Profile · TPPF Clinic</title>
+<link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" id="page-content">
+
+        <!-- User Summary Card -->
+        <div class="panel" style="max-width:680px; margin-bottom:20px; background:linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-light) 100%);">
+          <div style="display:flex; align-items:center; gap:16px;">
+            <div id="profile-avatar-large" class="avatar" style="width:56px; height:56px; font-size:22px; font-weight:700; background:var(--color-primary); color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center;">?</div>
+            <div>
+              <h2 id="profile-header-name" style="font-size:18px; color:var(--color-primary-darker);">User Profile</h2>
+              <div id="profile-header-username" style="font-size:13px; color:var(--color-text-muted); margin-top:2px;">@username</div>
+              <div id="profile-header-roles" style="margin-top:6px; display:flex; gap:4px; flex-wrap:wrap;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Edit Profile Details -->
+        <div class="panel" style="max-width:680px; margin-bottom:20px;">
+          <div class="panel-header">
+            <h3>Profile Settings</h3>
+            <span class="panel-meta">Update your personal account information</span>
+          </div>
+          <form id="profile-info-form">
+            <div class="form-grid">
+              <div class="field span-2">
+                <label for="prof-username">Username</label>
+                <input type="text" id="prof-username" required />
+              </div>
+              <div class="field span-2">
+                <label for="prof-fullname">Full name</label>
+                <input type="text" id="prof-fullname" required />
+              </div>
+              <div class="field span-2">
+                <label>Assigned Roles</label>
+                <div id="prof-roles-display" style="padding:10px 12px; border:1px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-bg); display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                  <span class="text-muted" style="font-size:13px;">Loading roles…</span>
+                </div>
+                <div class="hint">Roles are assigned by clinic administrators and cannot be changed here.</div>
+              </div>
+            </div>
+            <div style="margin-top:18px;">
+              <button type="submit" class="btn btn-primary" id="prof-info-submit">Save Profile Changes</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Change Password -->
+        <div class="panel" style="max-width:680px;">
+          <div class="panel-header">
+            <h3>Security &amp; Password</h3>
+            <span class="panel-meta">Change your account password</span>
+          </div>
+          <form id="profile-password-form">
+            <div class="form-grid">
+              <div class="field span-2">
+                <label for="prof-curr-pass">Current password</label>
+                <input type="password" id="prof-curr-pass" required placeholder="Enter current password" />
+              </div>
+              <div class="field">
+                <label for="prof-new-pass">New password</label>
+                <input type="password" id="prof-new-pass" required placeholder="At least 6 characters" />
+              </div>
+              <div class="field">
+                <label for="prof-conf-pass">Confirm new password</label>
+                <input type="password" id="prof-conf-pass" required placeholder="Re-enter new password" />
+              </div>
+            </div>
+            <div style="margin-top:18px;">
+              <button type="submit" class="btn btn-primary" id="prof-pass-submit">Update Password</button>
+            </div>
+          </form>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/profile.js"></script>
+</body>
+</html>

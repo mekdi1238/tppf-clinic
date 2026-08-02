@@ -12,7 +12,7 @@ router.use(requireAuth);
 const ACCEPT_AS_STAFF_ROLES = requireRole("hr_admin", "physician", "system_administrator");
 
 router.get("/registrations", requireRole("receptionist", "physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
-  const { search, status } = req.query;
+  const { search, status, department } = req.query;
   const conditions = [];
   const params = [];
 
@@ -25,6 +25,10 @@ router.get("/registrations", requireRole("receptionist", "physician", "system_ad
   if (status && status !== "all") {
     params.push(status);
     conditions.push(`status = $${params.length}`);
+  }
+  if (department && department !== "all") {
+    params.push(department);
+    conditions.push(`department = $${params.length}`);
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";

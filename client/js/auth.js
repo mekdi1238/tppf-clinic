@@ -17,6 +17,13 @@ const Auth = {
   setSession(session) {
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
   },
+  updateUser(userData) {
+    const session = this.getSession();
+    if (session) {
+      session.user = { ...session.user, ...userData };
+      this.setSession(session);
+    }
+  },
   clearSession() {
     sessionStorage.removeItem(SESSION_KEY);
   },
@@ -26,6 +33,7 @@ const Auth = {
   requireAuth() {
     if (!this.isLoggedIn()) {
       window.location.href = 'login.html';
+      throw new Error('redirecting to login');
     }
   },
   logout() {

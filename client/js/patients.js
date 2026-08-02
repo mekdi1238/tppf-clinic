@@ -27,6 +27,16 @@ if (!perms.create) {
 let currentList = [];
 let editingId = null;
 
+const DEPARTMENT_POSITIONS = {
+  'Medical': ['Physician (General)', 'Specialist Physician', 'Lab Technician', 'Pharmacist', 'Nurse', 'Radiologist', 'Medical Officer'],
+  'Finance': ['Finance Officer', 'Accountant', 'Senior Accountant', 'Finance Manager', 'Budget Officer'],
+  'Human Resource Management': ['HR Manager', 'HR Officer', 'HR Administrator', 'Safety Officer', 'Security Officer', 'Security Guard', 'Safety and Security Supervisor'],
+  'Planning and Budget Service': ['Planning Officer', 'Budget Analyst', 'Planning Manager', 'Budget Planning Coordinator'],
+  'Product Quality Control Service': ['Quality Control Inspector', 'QC Supervisor', 'Quality Assurance Officer', 'QC Manager'],
+  'Production and Technic': ['Technician', 'Machine Operator', 'Production Supervisor', 'Senior Technician', 'Maintenance Engineer'],
+  'Property Management': ['Property Officer', 'Facility Manager', 'Property Supervisor', 'Maintenance Officer'],
+};
+
 function debounce(fn, ms) {
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
@@ -35,8 +45,9 @@ function debounce(fn, ms) {
 async function loadPatients() {
   const search = document.getElementById('search-input').value.trim();
   const status = document.getElementById('status-filter').value;
+  const department = document.getElementById('department-filter').value;
   try {
-    currentList = await Api.patients.list({ search, status });
+    currentList = await Api.patients.list({ search, status, department });
     renderTable(currentList);
   } catch (e) {
     UI.toast(UI.errorMessage(e), 'danger');
@@ -62,7 +73,7 @@ function renderTable(list) {
       <table class="data-table">
         <thead>
           <tr>
-            <th>Code</th><th>Full name</th><th>Gender</th><th>Age</th><th>Phone</th><th>Registered</th><th>Status</th><th></th>
+            <th>Code</th><th>Full name</th><th>Gender</th><th>Department</th><th>Age</th><th>Phone</th><th>Registered</th><th>Status</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -76,6 +87,7 @@ function renderTable(list) {
                 </div>
               </td>
               <td class="cell-muted" style="text-transform:capitalize;">${p.gender || '—'}</td>
+              <td class="cell-muted">${p.department ? UI.escapeHtml(p.department) : '—'}</td>
               <td class="cell-muted">${UI.age(p.date_of_birth)}</td>
               <td class="cell-muted">${UI.escapeHtml(p.phone) || '—'}</td>
               <td class="cell-muted">${UI.formatDate(p.registered_date)}</td>
@@ -118,6 +130,9 @@ async function openPatientForm(id = null) {
     document.getElementById('pf-full-name').value = p.full_name || '';
     document.getElementById('pf-dob').value = p.date_of_birth || '';
     document.getElementById('pf-gender').value = p.gender || '';
+    document.getElementById('pf-department').value = p.department || '';
+    document.getElementById('pf-department').dispatchEvent(new Event('change'));
+    document.getElementById('pf-position').value = p.position || '';
     document.getElementById('pf-phone').value = p.phone || '';
     document.getElementById('pf-location').value = p.location || '';
     document.getElementById('pf-address').value = p.address || '';
@@ -125,6 +140,8 @@ async function openPatientForm(id = null) {
   } else {
     document.getElementById('patient-modal-title').textContent = 'New Patient';
     document.getElementById('patient-modal-sub').textContent = 'Add a walk-in patient to the clinic register.';
+    document.getElementById('pf-department').value = '';
+    document.getElementById('pf-department').dispatchEvent(new Event('change'));
     document.getElementById('patient-form-note').textContent = 'A patient code (S0xx) will be assigned automatically.';
   }
 
@@ -163,6 +180,8 @@ document.getElementById('patient-form').addEventListener('submit', async (e) => 
     full_name: document.getElementById('pf-full-name').value.trim(),
     date_of_birth: document.getElementById('pf-dob').value || null,
     gender: document.getElementById('pf-gender').value || null,
+    department: document.getElementById('pf-department').value || null,
+    position: document.getElementById('pf-position').value || null,
     phone: document.getElementById('pf-phone').value.trim(),
     location: document.getElementById('pf-location').value.trim(),
     address: document.getElementById('pf-address').value.trim(),
@@ -275,6 +294,8 @@ function renderFullPatientDetail(p) {
       <div class="detail-grid">
         <div class="detail-item"><div class="k">Gender</div><div class="v" style="text-transform:capitalize;">${p.gender || '—'}</div></div>
         <div class="detail-item"><div class="k">Age</div><div class="v">${UI.age(p.date_of_birth)}</div></div>
+        <div class="detail-item"><div class="k">Department</div><div class="v">${UI.escapeHtml(p.department) || '—'}</div></div>
+        <div class="detail-item"><div class="k">Position</div><div class="v">${UI.escapeHtml(p.position) || '—'}</div></div>
         <div class="detail-item"><div class="k">Phone</div><div class="v">${UI.escapeHtml(p.phone) || '—'}</div></div>
         <div class="detail-item"><div class="k">Status</div><div class="v">${UI.patientStatusBadge(p.is_active)}</div></div>
         <div class="detail-item"><div class="k">Location</div><div class="v">${UI.escapeHtml(p.location) || '—'}</div></div>
@@ -406,8 +427,21 @@ document.getElementById('patient-detail-backdrop').addEventListener('click', (e)
   if (e.target.id === 'patient-detail-backdrop') closePatientDetail();
 });
 
+document.getElementById('pf-department').addEventListener('change', (e) => {
+  const dept = e.target.value;
+  const posSelect = document.getElementById('pf-position');
+  if (!dept) {
+    posSelect.innerHTML = '<option value="">Select department first…</option>';
+    return;
+  }
+  const positions = DEPARTMENT_POSITIONS[dept] || [];
+  posSelect.innerHTML = `<option value="">Select position…</option>` +
+    positions.map(p => `<option value="${UI.escapeHtml(p)}">${UI.escapeHtml(p)}</option>`).join('');
+});
+
 document.getElementById('search-input').addEventListener('input', debounce(loadPatients, 250));
 document.getElementById('status-filter').addEventListener('change', loadPatients);
+document.getElementById('department-filter').addEventListener('change', loadPatients);
 
 async function init() {
   await loadPatients();

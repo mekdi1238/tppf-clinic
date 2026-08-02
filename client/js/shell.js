@@ -10,6 +10,12 @@ const NAV_SECTIONS = [
     ],
   },
   {
+    label: 'Account',
+    items: [
+      { key: 'profile', label: 'Profile', icon: 'user', href: 'profile.html', active: true },
+    ],
+  },
+  {
     label: 'Patient Care',
     items: [
       { key: 'patients', label: 'Patients', icon: 'patients', href: 'patients.html', active: true },

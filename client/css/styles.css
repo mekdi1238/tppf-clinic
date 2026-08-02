@@ -178,7 +178,7 @@ table { border-collapse: collapse; }
   color: var(--color-text-muted);
   margin-bottom: 6px;
 }
-.field input, .field select, .field textarea {
+.field input:not([type="checkbox"]):not([type="radio"]), .field select, .field textarea {
   width: 100%;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
@@ -189,13 +189,43 @@ table { border-collapse: collapse; }
   background: var(--color-surface);
   transition: border-color .15s ease, box-shadow .15s ease;
 }
-.field input:focus, .field select:focus, .field textarea:focus {
+.field input:not([type="checkbox"]):not([type="radio"]):focus, .field select:focus, .field textarea:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-tint);
   outline: none;
 }
 .field-error { color: var(--color-danger); font-size: 12px; margin-top: 4px; }
 .field .hint { color: var(--color-text-faint); font-size: 11.5px; margin-top: 4px; }
+
+/* ---------- Checkboxes & Radios ---------- */
+input[type="checkbox"],
+input[type="radio"] {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  flex-shrink: 0 !important;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+label:has(input[type="checkbox"]),
+label:has(input[type="radio"]) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  width: 100% !important;
+  text-align: left !important;
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  color: var(--color-text) !important;
+  cursor: pointer;
+}
 
 .login-alert {
   display: none;

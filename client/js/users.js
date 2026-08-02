@@ -31,7 +31,7 @@ async function loadLookups() {
   document.getElementById('ue-physician').innerHTML = physOptions;
 
   const rolesHtml = (checkedIds) => rolesCache.map(r => `
-    <label style="display:flex; align-items:center; gap:8px; font-size:13px; padding:4px 0; cursor:pointer;">
+    <label style="display:flex; align-items:center; justify-content:flex-start; gap:10px; font-size:13.5px; padding:5px 0; cursor:pointer;">
       <input type="checkbox" class="role-checkbox" value="${r.id}" ${checkedIds && checkedIds.includes(r.id) ? 'checked' : ''} />
       <span>${UI.escapeHtml(r.display_name)}</span>
     </label>
@@ -79,7 +79,7 @@ function renderTable(list) {
               </td>
               <td class="cell-muted">${UI.escapeHtml(u.full_name) || '—'}</td>
               <td>${u.roles.map(r => `<span class="badge badge-primary" style="margin-right:4px;">${UI.escapeHtml(r.display_name)}</span>`).join('')}</td>
-              <td class="cell-muted">${u.physician_id ? UI.escapeHtml((physiciansCache.find(p => p.id === u.physician_id) || {}).full_name || '—') : '—'}</td>
+              <td class="cell-muted">${u.physician_id ? UI.escapeHtml((physiciansCache.find(p => String(p.id) === String(u.physician_id)) || {}).full_name || '—') : '—'}</td>
               <td>${u.is_active ? `<span class="badge badge-success"><span class="badge-dot"></span>Active</span>` : `<span class="badge badge-neutral"><span class="badge-dot"></span>Inactive</span>`}</td>
               <td class="cell-muted">${u.last_login_at ? UI.formatDateTime(u.last_login_at) : 'Never'}</td>
               <td><button class="icon-btn" title="Edit" onclick="openUserEdit('${u.id}')">${Icons.render('edit')}</button></td>
@@ -149,19 +149,21 @@ document.getElementById('user-form').addEventListener('submit', async (e) => {
 
 // ---------- Edit user ----------
 function openUserEdit(id) {
-  const u = usersCache.find(x => x.id === id);
+  const u = usersCache.find(x => String(x.id) === String(id));
   if (!u) return;
-  editingUserId = id;
+  editingUserId = u.id;
   document.getElementById('ue-title').textContent = u.username;
   document.getElementById('ue-sub').textContent = u.full_name || 'No full name on file';
+  document.getElementById('ue-username').value = u.username || '';
+  document.getElementById('ue-password').value = '';
   document.getElementById('ue-full-name').value = u.full_name || '';
   document.getElementById('ue-physician').value = u.physician_id || '';
   document.getElementById('user-edit-notice').innerHTML = '';
 
-  const roleIds = u.roles.map(r => r.id);
+  const roleIds = u.roles.map(r => String(r.id));
   document.getElementById('ue-roles-list').innerHTML = rolesCache.map(r => `
-    <label style="display:flex; align-items:center; gap:8px; font-size:13px; padding:4px 0; cursor:pointer;">
-      <input type="checkbox" class="ue-role-checkbox" value="${r.id}" ${roleIds.includes(r.id) ? 'checked' : ''} />
+    <label style="display:flex; align-items:center; justify-content:flex-start; gap:10px; font-size:13.5px; padding:5px 0; cursor:pointer;">
+      <input type="checkbox" class="ue-role-checkbox" value="${r.id}" ${roleIds.includes(String(r.id)) ? 'checked' : ''} />
       <span>${UI.escapeHtml(r.display_name)}</span>
     </label>
   `).join('');
@@ -182,12 +184,17 @@ document.getElementById('user-edit-form').addEventListener('submit', async (e) =
   e.preventDefault();
   const roleIds = Array.from(document.querySelectorAll('#ue-roles-list .ue-role-checkbox:checked')).map(cb => cb.value);
   if (!roleIds.length) { UI.toast('Assign at least one role.', 'danger'); return; }
+  const newPassword = document.getElementById('ue-password').value;
+  if (newPassword && newPassword.length < 6) { UI.toast('Password must be at least 6 characters.', 'danger'); return; }
+  const payload = {
+    username: document.getElementById('ue-username').value.trim(),
+    full_name: document.getElementById('ue-full-name').value.trim(),
+    physician_id: document.getElementById('ue-physician').value || null,
+    role_ids: roleIds,
+  };
+  if (newPassword) payload.password = newPassword;
   try {
-    await Api.users.update(editingUserId, {
-      full_name: document.getElementById('ue-full-name').value.trim(),
-      physician_id: document.getElementById('ue-physician').value || null,
-      role_ids: roleIds,
-    });
+    await Api.users.update(editingUserId, payload);
     UI.toast('User updated.');
     closeUserEdit();
     loadUsers();
@@ -196,20 +203,10 @@ document.getElementById('user-edit-form').addEventListener('submit', async (e) =
   }
 });
 
-document.getElementById('ue-reset-password-btn').addEventListener('click', async () => {
-  const newPassword = prompt('Enter a new temporary password (at least 6 characters):');
-  if (!newPassword) return;
-  if (newPassword.length < 6) { UI.toast('Password must be at least 6 characters.', 'danger'); return; }
-  try {
-    await Api.users.resetPassword(editingUserId, newPassword);
-    UI.toast('Password reset.');
-  } catch (e) {
-    UI.toast(UI.errorMessage(e), 'danger');
-  }
-});
+
 
 document.getElementById('ue-toggle-active-btn').addEventListener('click', async (e) => {
-  const u = usersCache.find(x => x.id === editingUserId);
+  const u = usersCache.find(x => String(x.id) === String(editingUserId));
   if (!u) return;
   const btn = e.currentTarget;
   btn.disabled = true;

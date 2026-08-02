@@ -346,6 +346,7 @@ async function mockRequest(method, path, body) {
       }
       if (qs.status === 'active') list = list.filter(p => p.is_active);
       if (qs.status === 'inactive') list = list.filter(p => !p.is_active);
+      if (qs.department && qs.department !== 'all') list = list.filter(p => p.department === qs.department);
       list.sort((a, b) => new Date(b.registered_date) - new Date(a.registered_date));
       return list;
     }
@@ -498,6 +499,7 @@ async function mockRequest(method, path, body) {
         list = list.filter(r => r.full_name.toLowerCase().includes(s) || r.registration_code.toLowerCase().includes(s) || (r.occupation || '').toLowerCase().includes(s));
       }
       if (qs.status && qs.status !== 'all') list = list.filter(r => r.status === qs.status);
+      if (qs.department && qs.department !== 'all') list = list.filter(r => r.department === qs.department);
       list.sort((a, b) => new Date(b.registration_date) - new Date(a.registration_date));
       return list;
     }
@@ -1081,6 +1083,29 @@ async function mockRequest(method, path, body) {
     }
   }
 
+  // /profile
+  if (seg[0] === 'profile') {
+    const session = Auth.getSession();
+    const userId = session ? session.user.id : 'usr_admin';
+    let user = db.users.find(u => String(u.id) === String(userId)) || db.users[0];
+    if (method === 'GET') {
+      return { ...user, password: undefined, roles: (user.role_ids || []).map(rid => db.roles.find(r => r.id === rid)).filter(Boolean) };
+    }
+    if (method === 'PUT') {
+      if (body.username !== undefined) {
+        if (!body.username.trim()) { const err = new Error('Username is required.'); err.status = 422; throw err; }
+        user.username = body.username.trim();
+      }
+      if (body.full_name !== undefined) user.full_name = body.full_name.trim();
+      if (body.new_password) {
+        if (body.new_password.length < 6) { const err = new Error('Password must be at least 6 characters.'); err.status = 422; throw err; }
+        user.password = body.new_password;
+      }
+      saveDb(db);
+      return { ...user, password: undefined, roles: (user.role_ids || []).map(rid => db.roles.find(r => r.id === rid)).filter(Boolean) };
+    }
+  }
+
   // /settings
   if (seg[0] === 'settings') {
     if (method === 'GET') return db.settings;
@@ -1219,6 +1244,10 @@ const Api = {
     list: (params = {}) => apiRequest('GET', `/sick-leaves?${new URLSearchParams(params)}`),
     get: (id) => apiRequest('GET', `/sick-leaves/${id}`),
     create: (data) => apiRequest('POST', '/sick-leaves', data),
+  },
+  profile: {
+    get: () => apiRequest('GET', '/profile'),
+    update: (data) => apiRequest('PUT', '/profile', data),
   },
   roles: {
     list: () => apiRequest('GET', '/roles'),

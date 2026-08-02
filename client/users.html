@@ -95,6 +95,15 @@
       <form id="user-edit-form">
         <div class="modal-body">
           <div class="form-grid">
+            <div class="field">
+              <label for="ue-username">Username</label>
+              <input type="text" id="ue-username" required />
+            </div>
+            <div class="field">
+              <label for="ue-password">New password</label>
+              <input type="text" id="ue-password" placeholder="Leave blank to keep current" />
+              <div class="hint">At least 6 characters. Leave empty to keep existing password.</div>
+            </div>
             <div class="field span-2">
               <label for="ue-full-name">Full name</label>
               <input type="text" id="ue-full-name" />
@@ -112,7 +121,6 @@
         </div>
         <div class="modal-footer">
           <span class="footer-note" id="ue-footer-note"></span>
-          <button type="button" class="btn btn-secondary btn-sm" id="ue-reset-password-btn">Reset Password</button>
           <button type="button" class="btn btn-secondary btn-sm" id="ue-toggle-active-btn"></button>
           <button type="submit" class="btn btn-primary">Save Changes</button>
         </div>

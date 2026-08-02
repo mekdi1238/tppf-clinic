@@ -57,9 +57,9 @@ async function loadLookups() {
     <div style="margin-bottom:8px;">
       <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--color-text-faint); margin-bottom:4px;">${UI.escapeHtml(panel)}</div>
       ${catalogCache.filter(t => t.panel === panel).map(t => `
-        <label style="display:flex; align-items:center; gap:8px; font-size:13px; padding:4px 0; cursor:pointer;">
+        <label style="display:flex; align-items:center; justify-content:flex-start; gap:10px; font-size:13.5px; padding:5px 0; cursor:pointer;">
           <input type="checkbox" name="of-test" value="${t.id}" />
-          <span>${UI.escapeHtml(t.display_name)} <span class="cell-code">${UI.escapeHtml(t.code)}</span></span>
+          <span>${UI.escapeHtml(t.display_name)} <span class="cell-code" style="margin-left:4px;">${UI.escapeHtml(t.code)}</span></span>
         </label>
       `).join('')}
     </div>

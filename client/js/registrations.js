@@ -94,8 +94,9 @@ async function loadPhysicians() {
 async function loadRegistrations() {
   const search = document.getElementById('search-input').value.trim();
   const status = document.getElementById('status-filter').value;
+  const department = document.getElementById('department-filter').value;
   try {
-    currentList = await Api.registrations.list({ search, status });
+    currentList = await Api.registrations.list({ search, status, department });
     renderTable(currentList);
   } catch (e) {
     UI.toast(UI.errorMessage(e), 'danger');
@@ -120,7 +121,7 @@ function renderTable(list) {
     <div class="table-wrap">
       <table class="data-table">
         <thead>
-          <tr><th>Code</th><th>Full name</th><th>Gender</th><th>Age</th><th>Occupation</th><th>Registered</th><th>Status</th><th></th></tr>
+          <tr><th>Code</th><th>Full name</th><th>Gender</th><th>Department</th><th>Age</th><th>Occupation</th><th>Registered</th><th>Status</th><th></th></tr>
         </thead>
         <tbody>
           ${list.map(r => `
@@ -133,6 +134,7 @@ function renderTable(list) {
                 </div>
               </td>
               <td class="cell-muted" style="text-transform:capitalize;">${r.gender || '—'}</td>
+              <td class="cell-muted">${r.department ? UI.escapeHtml(r.department) : '—'}</td>
               <td class="cell-muted">${UI.age(r.date_of_birth)}</td>
               <td class="cell-muted">${UI.escapeHtml(r.occupation)}</td>
               <td class="cell-muted">${UI.formatDate(r.registration_date)}</td>
@@ -509,6 +511,7 @@ document.getElementById('cert-form').addEventListener('submit', async (e) => {
 
 document.getElementById('search-input').addEventListener('input', debounce(loadRegistrations, 250));
 document.getElementById('status-filter').addEventListener('change', loadRegistrations);
+document.getElementById('department-filter').addEventListener('change', loadRegistrations);
 
 async function init() {
   await loadPhysicians();
