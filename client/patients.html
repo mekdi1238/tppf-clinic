@@ -35,9 +35,14 @@
               <option value="Property Management">Property Management</option>
             </select>
           </div>
-          <button class="btn btn-primary" id="new-patient-btn">
-            <span id="plus-icon-slot"></span> New Patient
-          </button>
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="btn btn-secondary" id="export-patients-btn">
+              <span id="download-icon-slot"></span> Export
+            </button>
+            <button class="btn btn-primary" id="new-patient-btn">
+              <span id="plus-icon-slot"></span> New Patient
+            </button>
+          </div>
         </div>
 
         <div id="patients-table-region"></div>
@@ -145,6 +150,7 @@
   <script src="js/ui.js"></script>
   <script src="js/shell.js"></script>
   <script src="js/camera.js"></script>
+  <script src="js/exportModal.js"></script>
   <script src="js/patients.js"></script>
 </body>
 </html>

@@ -20,6 +20,14 @@ document.getElementById('plus-icon-slot').innerHTML = Icons.render('plus');
 document.getElementById('patient-modal-close').innerHTML = Icons.render('close');
 document.getElementById('patient-detail-close').innerHTML = Icons.render('close');
 
+const downloadIconEl = document.getElementById('download-icon-slot');
+if (downloadIconEl) downloadIconEl.innerHTML = Icons.render('download');
+
+const exportPatientsBtn = document.getElementById('export-patients-btn');
+if (exportPatientsBtn) {
+  exportPatientsBtn.addEventListener('click', () => ExportModal.open('patients'));
+}
+
 if (!perms.create) {
   document.getElementById('new-patient-btn').style.display = 'none';
 }

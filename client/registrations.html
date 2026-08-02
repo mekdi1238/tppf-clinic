@@ -44,9 +44,14 @@
               <option value="Property Management">Property Management</option>
             </select>
           </div>
-          <button class="btn btn-primary" id="new-registration-btn">
-            <span id="plus-icon-slot"></span> New Registration
-          </button>
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="btn btn-secondary" id="export-reg-btn">
+              <span id="download-icon-slot"></span> Export
+            </button>
+            <button class="btn btn-primary" id="new-registration-btn">
+              <span id="plus-icon-slot"></span> New Registration
+            </button>
+          </div>
         </div>
 
         <div id="registrations-table-region"></div>
@@ -253,6 +258,7 @@
   <script src="js/ui.js"></script>
   <script src="js/shell.js"></script>
   <script src="js/camera.js"></script>
+  <script src="js/exportModal.js"></script>
   <script src="js/registrations.js"></script>
 </body>
 </html>

@@ -17,6 +17,14 @@ document.getElementById('reg-detail-close').innerHTML = Icons.render('close');
 document.getElementById('cert-modal-close').innerHTML = Icons.render('close');
 document.getElementById('staff-modal-close').innerHTML = Icons.render('close');
 
+const downloadIconEl = document.getElementById('download-icon-slot');
+if (downloadIconEl) downloadIconEl.innerHTML = Icons.render('download');
+
+const exportRegBtn = document.getElementById('export-reg-btn');
+if (exportRegBtn) {
+  exportRegBtn.addEventListener('click', () => ExportModal.open('registrations'));
+}
+
 let currentList = [];
 let physiciansCache = [];
 let editingRegId = null;
