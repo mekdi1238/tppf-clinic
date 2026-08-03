@@ -1151,6 +1151,12 @@ async function mockRequest(method, path, body) {
 async function apiRequest(method, path, body) {
   const forceMock = MOCK_ONLY_PATHS.some(p => path.split('?')[0].startsWith(p));
   if (USE_MOCK || forceMock) {
+    if (path !== '/auth/login' && !Auth.isLoggedIn()) {
+      Auth.handleSessionExpired('expired');
+      const err = new Error('Session expired.');
+      err.status = 401;
+      throw err;
+    }
     return mockRequest(method, path, body);
   }
   const session = Auth.getSession();
@@ -1164,6 +1170,9 @@ async function apiRequest(method, path, body) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    if (res.status === 401 && path !== '/auth/login') {
+      Auth.handleSessionExpired('expired');
+    }
     const err = new Error(data.message || 'Request failed.');
     err.status = res.status;
     throw err;

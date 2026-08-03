@@ -58,12 +58,48 @@
     document.getElementById('app-icon-slot').innerHTML = Icons.render('stethoscope');
     document.getElementById('login-alert-icon').innerHTML = Icons.render('alert');
 
-    if (Auth.isLoggedIn()) {
-      // Don't silently bounce back to the old session — that would make
-      // it impossible to switch users without finding the Logout button
-      // first. Clear the stale session so the login form is always usable.
-      Auth.clearSession();
+    function getLandingPage() {
+      const allowed = RoleGuard.allowedNavKeys();
+      let landing = 'dashboard.html';
+      if (allowed) {
+        if (allowed.includes('dashboard')) {
+          landing = 'dashboard.html';
+        } else if (allowed.includes('reports')) {
+          landing = 'reports.html';
+        } else if (allowed[0]) {
+          const keyToPage = {
+            'patients': 'patients.html',
+            'visits': 'visits.html',
+            'admissions': 'admissions.html',
+            'employee-registrations': 'registrations.html',
+            'certifications': 'certifications.html',
+            'laboratory': 'laboratory.html',
+            'pharmacy': 'pharmacy.html',
+            'referrals': 'referrals.html',
+            'reports': 'reports.html',
+            'users': 'users.html',
+            'backup': 'backup.html',
+            'settings': 'settings.html',
+          };
+          landing = keyToPage[allowed[0]] || 'dashboard.html';
+        }
+      }
+      return landing;
     }
+
+    // Clear session immediately on fresh load
+    Auth.clearSession();
+
+    // When the browser restores login.html from bfcache (Back button),
+    // the DOM is stale (e.g. button stuck on "Signing in...").
+    // Force a full reload so the page is completely fresh.
+    window.addEventListener('pageshow', function (event) {
+      Auth.clearSession();
+      if (event.persisted) {
+        window.location.reload();
+        return;
+      }
+    });
 
     const form = document.getElementById('login-form');
     const alertBox = document.getElementById('login-alert');
@@ -83,6 +119,17 @@
       submitLabel.innerHTML = loading ? '<span class="spinner"></span> Signing in…' : 'Login';
     }
 
+    // Check if user was redirected due to session timeout/expiration
+    const urlParams = new URLSearchParams(window.location.search);
+    const reason = urlParams.get('reason');
+    if (reason === 'timeout') {
+      showError('Your session has timed out due to inactivity. Please sign in again.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (reason === 'expired') {
+      showError('Your session has expired. Please sign in again.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       hideError();
@@ -99,34 +146,7 @@
         const result = await Api.login(username, password);
         Auth.setSession(result);
 
-        // Role-based landing page: pick the first page the user is allowed to see
-        const allowed = RoleGuard.allowedNavKeys();
-        let landing = 'dashboard.html';
-        if (allowed) {
-          if (allowed.includes('dashboard')) {
-            landing = 'dashboard.html';
-          } else if (allowed.includes('reports')) {
-            landing = 'reports.html';
-          } else if (allowed[0]) {
-            // Map nav key to page filename (most follow the pattern key.html)
-            const keyToPage = {
-              'patients': 'patients.html',
-              'visits': 'visits.html',
-              'admissions': 'admissions.html',
-              'employee-registrations': 'registrations.html',
-              'certifications': 'certifications.html',
-              'laboratory': 'laboratory.html',
-              'pharmacy': 'pharmacy.html',
-              'referrals': 'referrals.html',
-              'reports': 'reports.html',
-              'users': 'users.html',
-              'backup': 'backup.html',
-              'settings': 'settings.html',
-            };
-            landing = keyToPage[allowed[0]] || 'dashboard.html';
-          }
-        }
-        window.location.href = landing;
+        window.location.href = getLandingPage();
       } catch (err) {
         showError(err.message || 'Could not sign in. Please try again.');
         setLoading(false);

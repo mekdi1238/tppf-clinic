@@ -45,6 +45,18 @@ function createApp() {
   app.use("/api/v1", settingsRoutes);
   app.use("/api/v1", backupsRoutes);
 
+  // Prevent browser from caching HTML pages (kills bfcache for protected pages).
+  // This forces the browser to re-fetch pages on Back/Forward navigation,
+  // ensuring auth.js's requireAuth() always runs fresh.
+  app.use((req, res, next) => {
+    if (req.path.endsWith(".html") || req.path === "/") {
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+      res.set("Pragma", "no-cache");
+      res.set("Expires", "0");
+    }
+    next();
+  });
+
   app.use(express.static(path.join(__dirname, "..", "..", "client")));
 
   app.use(notFound);
