@@ -43,6 +43,8 @@ const Icons = (() => {
     arrowRight: '<path d="M5 12h14M13 6l6 6-6 6"/>',
     heartPulse: '<path d="M19.5 12.6c0 4.4-7.5 8.4-7.5 8.4s-7.5-4-7.5-8.4a4.2 4.2 0 0 1 7.5-2.6 4.2 4.2 0 0 1 7.5 2.6z"/><path d="M3.5 13h3.2l1.3-3 2 6 2-6 1.3 3h3.2"/>',
     download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>',
+    upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/>',
+    fileImport: '<path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/><path d="M8 13h5m-2-2 2 2-2 2"/>',
   };
 
   function render(name, opts = {}) {

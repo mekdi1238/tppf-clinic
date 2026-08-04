@@ -20,9 +20,17 @@ document.getElementById('staff-modal-close').innerHTML = Icons.render('close');
 const downloadIconEl = document.getElementById('download-icon-slot');
 if (downloadIconEl) downloadIconEl.innerHTML = Icons.render('download');
 
+const uploadIconEl = document.getElementById('upload-icon-slot');
+if (uploadIconEl) uploadIconEl.innerHTML = Icons.render('upload');
+
 const exportRegBtn = document.getElementById('export-reg-btn');
 if (exportRegBtn) {
   exportRegBtn.addEventListener('click', () => ExportModal.open('registrations'));
+}
+
+const importRegBtn = document.getElementById('import-reg-btn');
+if (importRegBtn) {
+  importRegBtn.addEventListener('click', () => ImportModal.open('registrations', () => loadRegistrations()));
 }
 
 let currentList = [];

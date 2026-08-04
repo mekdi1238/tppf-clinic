@@ -23,9 +23,21 @@ document.getElementById('patient-detail-close').innerHTML = Icons.render('close'
 const downloadIconEl = document.getElementById('download-icon-slot');
 if (downloadIconEl) downloadIconEl.innerHTML = Icons.render('download');
 
+const uploadIconEl = document.getElementById('upload-icon-slot');
+if (uploadIconEl) uploadIconEl.innerHTML = Icons.render('upload');
+
 const exportPatientsBtn = document.getElementById('export-patients-btn');
 if (exportPatientsBtn) {
   exportPatientsBtn.addEventListener('click', () => ExportModal.open('patients'));
+}
+
+const importPatientsBtn = document.getElementById('import-patients-btn');
+if (importPatientsBtn) {
+  if (!perms.create) {
+    importPatientsBtn.style.display = 'none';
+  } else {
+    importPatientsBtn.addEventListener('click', () => ImportModal.open('patients', () => loadPatients()));
+  }
 }
 
 if (!perms.create) {

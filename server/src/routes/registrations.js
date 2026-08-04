@@ -214,6 +214,154 @@ router.post("/registrations/:id/accept-as-staff", requireRole("receptionist", "p
   res.status(201).json(result);
 }));
 
+// POST /registrations/import
+// Bulk-import pre-employment registrations from an array of row objects.
+// Supports two modes:
+//   atomic=true  → All-or-nothing: if any row fails, ROLLBACK and save nothing.
+//   atomic=false → Stop-on-error: commit rows 1…K-1, stop at row K, report error & remaining rows.
+router.post("/registrations/import", requireRole("receptionist", "physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
+  const { records, atomic = false } = req.body;
+
+  if (!Array.isArray(records) || records.length === 0) {
+    throw new ApiError(422, "import_records_required", "records must be a non-empty array.");
+  }
+
+  const REQUIRED_FIELDS = ["full_name", "department", "position", "occupation"];
+  const VALID_DEPARTMENTS = [
+    "Medical", "Finance", "Human Resource Management",
+    "Planning and Budget Service", "Product Quality Control Service",
+    "Production and Technic", "Property Management"
+  ];
+
+  // Validate a single row; returns an error string or null.
+  function validateRow(row) {
+    for (const field of REQUIRED_FIELDS) {
+      const val = (row[field] || "").toString().trim();
+      if (!val) return `Missing required field: "${field}"`;
+    }
+    if (!VALID_DEPARTMENTS.includes(row.department.trim())) {
+      return `Invalid department "${row.department}". Must be one of: ${VALID_DEPARTMENTS.join(", ")}.`;
+    }
+    if (row.date_of_birth && isNaN(Date.parse(row.date_of_birth))) {
+      return `Invalid date_of_birth "${row.date_of_birth}". Use YYYY-MM-DD format.`;
+    }
+    if (row.gender && !["male", "female"].includes(row.gender.toString().toLowerCase())) {
+      return `Invalid gender "${row.gender}". Must be "male" or "female".`;
+    }
+    return null;
+  }
+
+  // ---------- ATOMIC MODE: validate all rows first, then insert in one transaction ----------
+  if (atomic) {
+    for (let i = 0; i < records.length; i++) {
+      const err = validateRow(records[i]);
+      if (err) {
+        return res.status(422).json({
+          success: false,
+          mode: "atomic",
+          successCount: 0,
+          failedRowIndex: i + 1,          // 1-based for user display
+          failedRow: records[i],
+          error: err,
+          remainingRows: records.slice(i), // rows not yet processed (including failed)
+        });
+      }
+    }
+
+    // All rows valid — insert inside a single transaction
+    const inserted = await withTransaction(async (client) => {
+      const results = [];
+      for (const row of records) {
+        const r = await client.query(
+          `INSERT INTO employee_registrations
+             (registration_code, full_name, date_of_birth, gender, location, occupation, photo_url, status, department, position)
+           VALUES ('R' || lpad(nextval('registration_code_seq')::text, 3, '0'),
+                   $1, $2, $3, $4, $5, $6, 'pending', $7, $8)
+           RETURNING *;`,
+          [
+            row.full_name.trim(),
+            row.date_of_birth || null,
+            (row.gender || "").toLowerCase() || null,
+            row.location || "",
+            row.occupation.trim(),
+            row.photo_url || null,
+            row.department.trim(),
+            row.position.trim(),
+          ]
+        );
+        results.push(r.rows[0]);
+      }
+      return results;
+    });
+
+    return res.status(201).json({
+      success: true,
+      mode: "atomic",
+      successCount: inserted.length,
+      records: inserted,
+    });
+  }
+
+  // ---------- PARTIAL MODE: commit rows one-by-one, stop on first error ----------
+  const committed = [];
+  for (let i = 0; i < records.length; i++) {
+    const row = records[i];
+
+    // Client-side validation first (no DB round-trip)
+    const err = validateRow(row);
+    if (err) {
+      return res.status(207).json({
+        success: false,
+        mode: "partial",
+        successCount: committed.length,
+        failedRowIndex: i + 1,
+        failedRow: row,
+        error: err,
+        remainingRows: records.slice(i), // from the failed row onward
+      });
+    }
+
+    // DB insert (each row its own implicit transaction so prior rows are already durable)
+    try {
+      const result = await query(
+        `INSERT INTO employee_registrations
+           (registration_code, full_name, date_of_birth, gender, location, occupation, photo_url, status, department, position)
+         VALUES ('R' || lpad(nextval('registration_code_seq')::text, 3, '0'),
+                 $1, $2, $3, $4, $5, $6, 'pending', $7, $8)
+         RETURNING *;`,
+        [
+          row.full_name.trim(),
+          row.date_of_birth || null,
+          (row.gender || "").toLowerCase() || null,
+          row.location || "",
+          row.occupation.trim(),
+          row.photo_url || null,
+          row.department.trim(),
+          row.position.trim(),
+        ]
+      );
+      committed.push(result.rows[0]);
+    } catch (dbErr) {
+      return res.status(207).json({
+        success: false,
+        mode: "partial",
+        successCount: committed.length,
+        failedRowIndex: i + 1,
+        failedRow: row,
+        error: `Database error: ${dbErr.message}`,
+        remainingRows: records.slice(i),
+      });
+    }
+  }
+
+  return res.status(201).json({
+    success: true,
+    mode: "partial",
+    successCount: committed.length,
+    records: committed,
+  });
+}));
+
 router.delete("/registrations/:id", requireRole("system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const result = await query(`DELETE FROM employee_registrations WHERE id = $1 RETURNING id;`, [req.params.id]);
   if (!result.rows[0]) throw new ApiError(404, "registration_not_found", "Registration not found.");

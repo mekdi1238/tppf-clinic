@@ -1192,6 +1192,7 @@ const Api = {
     create: (data) => apiRequest('POST', '/patients', data),
     update: (id, data) => apiRequest('PUT', `/patients/${id}`, data),
     delete: (id) => apiRequest('DELETE', `/patients/${id}`),
+    import: (records, options = {}) => apiRequest('POST', '/patients/import', { records, ...options }),
   },
   visits: {
     list: (params = {}) => apiRequest('GET', `/visits?${new URLSearchParams(params)}`),
@@ -1210,6 +1211,7 @@ const Api = {
     update: (id, data) => apiRequest('PUT', `/registrations/${id}`, data),
     acceptAsStaff: (id, data) => apiRequest('POST', `/registrations/${id}/accept-as-staff`, data),
     delete: (id) => apiRequest('DELETE', `/registrations/${id}`),
+    import: (records, options = {}) => apiRequest('POST', '/registrations/import', { records, ...options }),
   },
   certifications: {
     list: (params = {}) => apiRequest('GET', `/certifications?${new URLSearchParams(params)}`),
