@@ -30,7 +30,7 @@ async function embedItems(order) {
 }
 
 router.get("/lab-test-catalog", LAB_READ, asyncHandler(async (req, res) => {
-  const result = await query(`SELECT * FROM lab_test_catalog ORDER BY panel, display_name;`);
+  const result = await query(`SELECT * FROM lab_test_catalog ORDER BY panel, sort_order, display_name;`);
   res.json(result.rows);
 }));
 
