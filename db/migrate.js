@@ -156,6 +156,39 @@ async function cmdDown(client) {
   }
 }
 
+async function ensureDatabaseExists() {
+  const dbUrl = process.env.DATABASE_URL;
+  const client = makeClient();
+  try {
+    await client.connect();
+    return client;
+  } catch (err) {
+    if (err.code === "3D000") {
+      // Database does not exist — connect to default 'postgres' DB and create it automatically
+      try {
+        const urlObj = new URL(dbUrl);
+        const dbName = urlObj.pathname.slice(1);
+        urlObj.pathname = "/postgres";
+        console.log(`Database "${dbName}" does not exist. Auto-creating database "${dbName}"...`);
+        const rootClient = new Client({ connectionString: urlObj.toString() });
+        await rootClient.connect();
+        await rootClient.query(`CREATE DATABASE "${dbName}";`);
+        await rootClient.end();
+        console.log(`  ✓ Database "${dbName}" created successfully.`);
+
+        // Now reconnect to the newly created target database
+        const newClient = makeClient();
+        await newClient.connect();
+        return newClient;
+      } catch (createErr) {
+        console.error(`Failed to auto-create database: ${createErr.message}`);
+        throw err;
+      }
+    }
+    throw err;
+  }
+}
+
 async function main() {
   const command = process.argv[2];
   if (!["up", "down", "status"].includes(command)) {
@@ -170,8 +203,7 @@ async function main() {
     process.exit(1);
   }
 
-  const client = makeClient();
-  await client.connect();
+  const client = await ensureDatabaseExists();
   try {
     await ensureMigrationsTable(client);
     if (command === "status") await cmdStatus(client);
