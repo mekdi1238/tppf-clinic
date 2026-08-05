@@ -75,12 +75,12 @@ echo [5/5] Checking database connectivity and running migrations...
 call npm run migrate:up
 if errorlevel 1 (
     echo.
-    echo [WARNING] Migration encountered an issue!
-    echo Please check that PostgreSQL is running and the DATABASE_URL in .env is correct.
-    echo Default connection expected: postgresql://tppf_dev:tppf_dev_pw@localhost:5432/tppf_clinic_dev
+    echo [DIAGNOSTIC] Analyzing Database Connection...
+    node db/check_db.js
     echo.
-    echo Press any key to attempt running seed anyway, or Ctrl+C to stop.
+    echo Press any key to retry setup after editing .env, or press Ctrl+C to exit.
     pause >nul
+    exit /b 1
 ) else (
     echo     - Database migrations applied successfully! (OK)
 )
