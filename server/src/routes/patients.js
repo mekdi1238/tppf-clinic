@@ -5,7 +5,7 @@ const requireAuth = require("../middleware/requireAuth");
 const requireRole = require("../middleware/requireRole");
 const { ApiError } = require("../middleware/errorHandler");
 
-const CLINICAL_READ = requireRole("receptionist", "physician", "lab_technician", "pharmacist", "system_administrator", "hr_admin");
+const CLINICAL_READ = requireRole("receptionist", "physician", "lab_technician", "pharmacist", "system_administrator", "hr_admin", "department_hr");
 const CLINICAL_WRITE = requireRole("receptionist", "physician", "system_administrator", "hr_admin");
 
 const router = express.Router();

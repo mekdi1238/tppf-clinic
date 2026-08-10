@@ -10,7 +10,7 @@ router.use(requireAuth);
 
 const CERTIFIABLE_STATUSES = ["pending", "certified_fit", "certified_unfit"];
 
-router.get("/certifications", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
+router.get("/certifications", requireRole("physician", "system_administrator", "hr_admin", "department_hr"), asyncHandler(async (req, res) => {
   const { search, result } = req.query;
   const conditions = [];
   const params = [];
@@ -18,10 +18,10 @@ router.get("/certifications", requireRole("physician", "system_administrator", "
   if (search) {
     params.push(`%${search.toLowerCase()}%`);
     conditions.push(
-      `(lower(r.full_name) LIKE $${params.length} OR lower(r.registration_code) LIKE $${params.length})`
+      `(lower(r.full_name) LIKE $${params.length} OR lower(r.registration_code) LIKE $${params.length} OR lower(r.occupation) LIKE $${params.length})`
     );
   }
-  if (result && result !== "all") {
+  if (result && result !== 'all') {
     params.push(result);
     conditions.push(`c.result = $${params.length}`);
   }
@@ -41,7 +41,7 @@ router.get("/certifications", requireRole("physician", "system_administrator", "
   res.json(rows.rows);
 }));
 
-router.get("/certifications/:id", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
+router.get("/certifications/:id", requireRole("physician", "system_administrator", "hr_admin", "department_hr"), asyncHandler(async (req, res) => {
   const result = await query(
     `SELECT c.*,
             row_to_json(r.*) AS registration,

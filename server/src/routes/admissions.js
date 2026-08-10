@@ -16,7 +16,7 @@ async function embedAdmission(row) {
   return { ...row, notes: notes.rows };
 }
 
-router.get("/admissions", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
+router.get("/admissions", requireRole("physician", "system_administrator", "hr_admin", "department_hr"), asyncHandler(async (req, res) => {
   const { search, status, visit_id } = req.query;
   const conditions = [];
   const params = [];

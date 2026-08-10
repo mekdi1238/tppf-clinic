@@ -11,7 +11,7 @@ router.use(requireAuth);
 // Only hr_admin and physician can accept a candidate as staff
 const ACCEPT_AS_STAFF_ROLES = requireRole("hr_admin", "physician", "system_administrator");
 
-router.get("/registrations", requireRole("receptionist", "physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
+router.get("/registrations", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "department_hr"), asyncHandler(async (req, res) => {
   const { search, status, department } = req.query;
   const conditions = [];
   const params = [];
@@ -39,7 +39,7 @@ router.get("/registrations", requireRole("receptionist", "physician", "system_ad
   res.json(result.rows);
 }));
 
-router.get("/registrations/:id", requireRole("receptionist", "physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
+router.get("/registrations/:id", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "department_hr"), asyncHandler(async (req, res) => {
   const regResult = await query(`SELECT * FROM employee_registrations WHERE id = $1;`, [req.params.id]);
   const registration = regResult.rows[0];
   if (!registration) throw new ApiError(404, "registration_not_found", "Registration not found.");

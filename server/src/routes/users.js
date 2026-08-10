@@ -102,7 +102,7 @@ router.get("/users", ADMIN_ONLY, asyncHandler(async (req, res) => {
 }));
 
 router.post("/users", ADMIN_ONLY, asyncHandler(async (req, res) => {
-  const { username, password, full_name, physician_id, role_ids } = req.body;
+  const { username, password, full_name, physician_id, role_ids, department } = req.body;
   if (!username || !username.trim()) throw new ApiError(422, "username_required", "Username is required.");
   if (!password || password.length < 6) throw new ApiError(422, "password_too_short", "Password must be at least 6 characters.");
   if (!Array.isArray(role_ids) || !role_ids.length) throw new ApiError(422, "roles_required", "Assign at least one role.");
@@ -112,9 +112,9 @@ router.post("/users", ADMIN_ONLY, asyncHandler(async (req, res) => {
 
   const passwordHash = await hashPassword(password);
   const result = await query(
-    `INSERT INTO users (username, password_hash, full_name, physician_id)
-     VALUES ($1, $2, $3, $4) RETURNING *;`,
-    [username.trim(), passwordHash, full_name || null, physician_id || null]
+    `INSERT INTO users (username, password_hash, full_name, physician_id, department)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *;`,
+    [username.trim(), passwordHash, full_name || null, physician_id || null, department ? department.trim() : null]
   );
   await setUserRoles(result.rows[0].id, role_ids);
   res.status(201).json(await embedRoles(result.rows[0]));
@@ -125,7 +125,7 @@ router.put("/users/:id", ADMIN_ONLY, asyncHandler(async (req, res) => {
   const user = current.rows[0];
   if (!user) throw new ApiError(404, "user_not_found", "User not found.");
 
-  const { username, password, full_name, physician_id, role_ids, is_active } = req.body;
+  const { username, password, full_name, physician_id, role_ids, is_active, department } = req.body;
 
   if (is_active === false && user.username === "admin") {
     throw new ApiError(422, "admin_protected", "The built-in admin account cannot be deactivated.");
@@ -156,8 +156,9 @@ router.put("/users/:id", ADMIN_ONLY, asyncHandler(async (req, res) => {
        full_name = COALESCE($2, full_name),
        physician_id = $3,
        is_active = COALESCE($4, is_active),
-       password_hash = COALESCE($5, password_hash)
-     WHERE id = $6
+       password_hash = COALESCE($5, password_hash),
+       department = $6
+     WHERE id = $7
      RETURNING *;`,
     [
       username !== undefined ? username.trim() : null,
@@ -165,6 +166,7 @@ router.put("/users/:id", ADMIN_ONLY, asyncHandler(async (req, res) => {
       physician_id !== undefined ? physician_id : user.physician_id,
       is_active !== undefined ? is_active : null,
       newPasswordHash,
+      department !== undefined ? (department ? department.trim() : null) : user.department,
       req.params.id,
     ]
   );

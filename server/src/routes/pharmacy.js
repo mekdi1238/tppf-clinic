@@ -5,7 +5,7 @@ const requireAuth = require("../middleware/requireAuth");
 const requireRole = require("../middleware/requireRole");
 const { ApiError } = require("../middleware/errorHandler");
 
-const RX_READ = requireRole("physician", "pharmacist", "system_administrator", "hr_admin");
+const RX_READ = requireRole("physician", "pharmacist", "system_administrator", "hr_admin", "department_hr");
 const RX_PRESCRIBE = requireRole("physician", "system_administrator", "hr_admin");
 const RX_DISPENSE = requireRole("pharmacist", "system_administrator", "hr_admin");
 
@@ -120,7 +120,7 @@ router.post("/prescriptions", RX_PRESCRIBE, asyncHandler(async (req, res) => {
     const rxResult = await client.query(
       `INSERT INTO prescriptions (visit_id, patient_id, physician_id, diagnosis_note)
        VALUES ($1, $2, $3, $4) RETURNING *;`,
-      [visit_id, visit.patient_id, physician_id || null, diagnosis_note || null]
+      [visit_id, visit.patient_id, physician_id || visit.physician_id || null, diagnosis_note || null]
     );
     for (const item of items) {
       if (!item.drug_id || !item.quantity_prescribed) continue;

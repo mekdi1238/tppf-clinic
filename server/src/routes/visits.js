@@ -27,7 +27,7 @@ async function embedVisit(row) {
   };
 }
 
-router.get("/visits", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "lab_technician", "pharmacist"), asyncHandler(async (req, res) => {
+router.get("/visits", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "lab_technician", "pharmacist", "department_hr"), asyncHandler(async (req, res) => {
   const { status, search } = req.query;
   const conditions = [];
   const params = [];
@@ -65,17 +65,23 @@ router.get("/visits/:id", requireRole("receptionist", "physician", "system_admin
   res.json(await embedVisit(visit));
 }));
 
-router.post("/visits", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "lab_technician", "pharmacist"), asyncHandler(async (req, res) => {
+router.post("/visits", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "lab_technician", "pharmacist", "department_hr"), asyncHandler(async (req, res) => {
   const { patient_id, physician_id, chief_complaint } = req.body;
-  if (!patient_id || !physician_id) {
-    throw new ApiError(422, "patient_and_physician_required", "Patient and physician are required.");
+  if (!patient_id) {
+    throw new ApiError(422, "patient_required", "Patient is required.");
+  }
+
+  let physId = physician_id;
+  if (!physId) {
+    const physResult = await query(`SELECT id FROM physicians WHERE is_active = true ORDER BY full_name LIMIT 1;`);
+    physId = physResult.rows[0] ? physResult.rows[0].id : null;
   }
 
   const result = await query(
-    `INSERT INTO visits (patient_id, physician_id, status, chief_complaint, examination_notes)
-     VALUES ($1, $2, 'open', $3, '')
+    `INSERT INTO visits (patient_id, physician_id, status, chief_complaint, examination_notes, created_by_user_id)
+     VALUES ($1, $2, 'open', $3, '', $4)
      RETURNING *;`,
-    [patient_id, physician_id, chief_complaint || ""]
+    [patient_id, physId, chief_complaint || "Checkup Dispatch", req.user.id]
   );
   res.status(201).json(result.rows[0]);
 }));
@@ -117,7 +123,7 @@ router.put("/visits/:id", requireRole("receptionist", "physician", "system_admin
     }
   }
 
-  const editable = ["status", "chief_complaint", "examination_notes", "diagnosis", "disposition"];
+  const editable = ["physician_id", "status", "chief_complaint", "examination_notes", "diagnosis", "disposition"];
   const updates = [];
   const params = [];
   for (const key of editable) {
@@ -136,7 +142,15 @@ router.put("/visits/:id", requireRole("receptionist", "physician", "system_admin
     `UPDATE visits SET ${updates.join(", ")}, updated_at = now() WHERE id = $${params.length} RETURNING *;`,
     params
   );
-  res.json(result.rows[0]);
+
+  if (req.body.physician_id && String(req.body.physician_id) !== String(current.physician_id)) {
+    await query(`UPDATE lab_orders SET physician_id = $1 WHERE visit_id = $2;`, [req.body.physician_id, req.params.id]);
+    await query(`UPDATE prescriptions SET physician_id = $1 WHERE visit_id = $2;`, [req.body.physician_id, req.params.id]);
+    await query(`UPDATE referrals SET physician_id = $1 WHERE visit_id = $2;`, [req.body.physician_id, req.params.id]);
+    await query(`UPDATE sick_leaves SET physician_id = $1 WHERE visit_id = $2;`, [req.body.physician_id, req.params.id]);
+  }
+
+  res.json(await embedVisit(result.rows[0]));
 }));
 
 module.exports = router;

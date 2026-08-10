@@ -5,7 +5,7 @@ const requireAuth = require("../middleware/requireAuth");
 const requireRole = require("../middleware/requireRole");
 const { ApiError } = require("../middleware/errorHandler");
 
-const LAB_READ = requireRole("physician", "lab_technician", "system_administrator", "hr_admin");
+const LAB_READ = requireRole("physician", "lab_technician", "system_administrator", "hr_admin", "department_hr");
 const LAB_ORDER = requireRole("physician", "system_administrator", "hr_admin");
 const LAB_RESULTS = requireRole("lab_technician", "physician", "system_administrator", "hr_admin");
 
@@ -79,12 +79,13 @@ router.post("/lab-orders", LAB_ORDER, asyncHandler(async (req, res) => {
     throw new ApiError(422, "tests_required", "Select at least one test.");
   }
 
-  const visitResult = await query(`SELECT id FROM visits WHERE id = $1;`, [visit_id]);
+  const visitResult = await query(`SELECT id, physician_id FROM visits WHERE id = $1;`, [visit_id]);
   if (!visitResult.rows[0]) throw new ApiError(422, "invalid_visit", "Select a valid visit.");
+  const effectivePhysicianId = physician_id || visitResult.rows[0].physician_id;
 
   const orderResult = await query(
     `INSERT INTO lab_orders (visit_id, physician_id) VALUES ($1, $2) RETURNING *;`,
-    [visit_id, physician_id || null]
+    [visit_id, effectivePhysicianId]
   );
   const order = orderResult.rows[0];
 

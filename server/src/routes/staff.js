@@ -8,7 +8,7 @@ const router = express.Router();
 router.use(requireAuth);
 
 // GET /staff — list all clinic staff, filterable by department and search
-router.get("/staff", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "lab_technician", "pharmacist"), asyncHandler(async (req, res) => {
+router.get("/staff", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "lab_technician", "pharmacist", "department_hr"), asyncHandler(async (req, res) => {
   const { search, department, active } = req.query;
   const conditions = [];
   const params = [];
@@ -43,7 +43,7 @@ router.get("/staff", requireRole("receptionist", "physician", "system_administra
 }));
 
 // GET /staff/:id — single staff record with source registration
-router.get("/staff/:id", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "lab_technician", "pharmacist"), asyncHandler(async (req, res) => {
+router.get("/staff/:id", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "lab_technician", "pharmacist", "department_hr"), asyncHandler(async (req, res) => {
   const result = await query(
     `SELECT
        s.*,
