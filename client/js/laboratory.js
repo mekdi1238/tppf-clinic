@@ -184,8 +184,15 @@ async function loadLookups() {
   } else {
     visitSelect.innerHTML = `<option value="">Select a visit…</option>` +
       eligibleVisits.map(v =>
-        `<option value="${v.id}" data-physician="${v.physician_id}">${UI.escapeHtml(v.patient.full_name)} — ${v.patient.patient_code} · ${UI.formatDate(v.visit_date)}</option>`
+        `<option value="${v.id}" data-physician="${v.physician_id}">${UI.escapeHtml(v.patient ? v.patient.full_name : '')} — ${v.patient ? v.patient.patient_code : ''} · ${UI.formatDate(v.visit_date)}</option>`
       ).join('');
+
+    const visitOptions = eligibleVisits.map(v => ({
+      value: v.id,
+      label: `${v.patient ? v.patient.full_name : 'Patient'} (${v.patient ? v.patient.patient_code : ''})`,
+      sublabel: `${UI.escapeHtml(v.chief_complaint || 'Visit')} · ${UI.formatDate(v.visit_date)}`
+    }));
+    UI.makeSearchableSelect(visitSelect, visitOptions, 'Search patient by name or code…');
   }
 
   populateOrderFormTabs();

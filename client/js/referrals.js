@@ -61,6 +61,16 @@ async function loadLookups() {
   document.getElementById('rf-visit').innerHTML = visitOptionsHtml;
   document.getElementById('sf-visit').innerHTML = visitOptionsHtml;
 
+  if (eligibleVisits.length) {
+    const visitOptions = eligibleVisits.map(v => ({
+      value: v.id,
+      label: `${v.patient ? v.patient.full_name : 'Patient'} (${v.patient ? v.patient.patient_code : ''})`,
+      sublabel: `${UI.escapeHtml(v.chief_complaint || 'Visit')} · ${UI.formatDate(v.visit_date)}`
+    }));
+    UI.makeSearchableSelect(document.getElementById('rf-visit'), visitOptions, 'Search patient by name or code…');
+    UI.makeSearchableSelect(document.getElementById('sf-visit'), visitOptions, 'Search patient by name or code…');
+  }
+
   const physOptionsHtml = `<option value="">Select…</option>` +
     physiciansCache.map(p => `<option value="${p.id}">${UI.escapeHtml(p.full_name)}</option>`).join('');
   document.getElementById('rf-physician').innerHTML = physOptionsHtml;

@@ -146,7 +146,122 @@ const UI = (() => {
     return (e && e.message) ? e.message : 'Something went wrong. Please try again.';
   }
 
-  return { toast, escapeHtml, formatDate, formatDateTime, age, visitStatusBadge, patientStatusBadge, registrationStatusBadge, certResultBadge, admissionStatusBadge, labOrderStatusBadge, prescriptionStatusBadge, stockBadge, errorMessage, avatar };
+  function makeSearchableSelect(selectEl, optionsData, placeholder = 'Type to search…') {
+    if (!selectEl) return;
+    
+    selectEl.style.display = 'none';
+
+    let parentField = selectEl.closest('.field') || selectEl.parentNode;
+    let oldWrap = parentField.querySelector('.searchable-select-wrap');
+    if (oldWrap) oldWrap.remove();
+
+    const wrap = document.createElement('div');
+    wrap.className = 'searchable-select-wrap';
+    
+    const inputBox = document.createElement('div');
+    inputBox.className = 'searchable-select-input-box';
+    
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'searchable-select-input';
+    input.placeholder = placeholder;
+    input.autocomplete = 'off';
+
+    const arrow = document.createElement('span');
+    arrow.className = 'searchable-select-arrow';
+    arrow.innerHTML = '&#9660;';
+
+    inputBox.appendChild(input);
+    inputBox.appendChild(arrow);
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'searchable-select-dropdown';
+
+    wrap.appendChild(inputBox);
+    wrap.appendChild(dropdown);
+
+    selectEl.parentNode.insertBefore(wrap, selectEl.nextSibling);
+
+    let currentOptions = optionsData.map(opt => typeof opt === 'string' ? { value: opt, label: opt } : opt);
+
+    function renderOptions(filterText = '') {
+      const text = filterText.toLowerCase().trim();
+      const filtered = currentOptions.filter(o => 
+        !text || 
+        (o.label && o.label.toLowerCase().includes(text)) || 
+        (o.sublabel && o.sublabel.toLowerCase().includes(text)) ||
+        (o.value && String(o.value).toLowerCase().includes(text))
+      );
+
+      if (!filtered.length) {
+        dropdown.innerHTML = `<div class="searchable-select-empty">No matching records found</div>`;
+        return;
+      }
+
+      dropdown.innerHTML = filtered.map(o => {
+        const isSelected = String(selectEl.value) === String(o.value);
+        return `
+          <div class="searchable-select-option ${isSelected ? 'selected' : ''}" data-value="${escapeHtml(String(o.value))}" data-label="${escapeHtml(o.label)}">
+            <span>${escapeHtml(o.label)}</span>
+            ${o.sublabel ? `<span class="option-sub">${escapeHtml(o.sublabel)}</span>` : ''}
+          </div>
+        `;
+      }).join('');
+
+      dropdown.querySelectorAll('.searchable-select-option').forEach(optEl => {
+        optEl.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          const val = optEl.getAttribute('data-value');
+          const lbl = optEl.getAttribute('data-label');
+          selectEl.value = val;
+          input.value = lbl;
+          selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+          dropdown.classList.remove('visible');
+        });
+      });
+    }
+
+    const initialOpt = currentOptions.find(o => String(o.value) === String(selectEl.value));
+    if (initialOpt) {
+      input.value = initialOpt.label;
+    }
+
+    input.addEventListener('focus', () => {
+      renderOptions(input.value);
+      dropdown.classList.add('visible');
+    });
+
+    input.addEventListener('input', () => {
+      renderOptions(input.value);
+      dropdown.classList.add('visible');
+    });
+
+    input.addEventListener('blur', () => {
+      setTimeout(() => dropdown.classList.remove('visible'), 150);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!wrap.contains(e.target)) {
+        dropdown.classList.remove('visible');
+      }
+    });
+
+    return {
+      setValue: (val, label) => {
+        selectEl.value = val;
+        input.value = label || val;
+      },
+      updateOptions: (newOpts) => {
+        currentOptions = newOpts.map(opt => typeof opt === 'string' ? { value: opt, label: opt } : opt);
+        const selOpt = currentOptions.find(o => String(o.value) === String(selectEl.value));
+        if (selOpt) input.value = selOpt.label;
+        else input.value = '';
+        renderOptions('');
+      }
+    };
+  }
+
+  return { toast, escapeHtml, formatDate, formatDateTime, age, visitStatusBadge, patientStatusBadge, registrationStatusBadge, certResultBadge, admissionStatusBadge, labOrderStatusBadge, prescriptionStatusBadge, stockBadge, errorMessage, avatar, makeSearchableSelect };
 })();
 
 // Escape key closes whichever modal is currently open, on any page.

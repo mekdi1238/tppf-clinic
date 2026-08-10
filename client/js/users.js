@@ -67,7 +67,7 @@ function renderTable(list) {
   region.innerHTML = `
     <div class="table-wrap">
       <table class="data-table">
-        <thead><tr><th>Username</th><th>Full name</th><th>Roles</th><th>Linked physician</th><th>Status</th><th>Last login</th><th></th></tr></thead>
+        <thead><tr><th>Username</th><th>Full name</th><th>Roles</th><th>Assigned Dept</th><th>Linked physician</th><th>Status</th><th>Last login</th><th></th></tr></thead>
         <tbody>
           ${list.map(u => `
             <tr>
@@ -79,6 +79,7 @@ function renderTable(list) {
               </td>
               <td class="cell-muted">${UI.escapeHtml(u.full_name) || '—'}</td>
               <td>${u.roles.map(r => `<span class="badge badge-primary" style="margin-right:4px;">${UI.escapeHtml(r.display_name)}</span>`).join('')}</td>
+              <td class="cell-muted">${u.department ? UI.escapeHtml(u.department) : '—'}</td>
               <td class="cell-muted">${u.physician_id ? UI.escapeHtml((physiciansCache.find(p => String(p.id) === String(u.physician_id)) || {}).full_name || '—') : '—'}</td>
               <td>${u.is_active ? `<span class="badge badge-success"><span class="badge-dot"></span>Active</span>` : `<span class="badge badge-neutral"><span class="badge-dot"></span>Inactive</span>`}</td>
               <td class="cell-muted">${u.last_login_at ? UI.formatDateTime(u.last_login_at) : 'Never'}</td>
@@ -91,10 +92,22 @@ function renderTable(list) {
   `;
 }
 
+// Helper to check if Department HR role is selected in checkboxes
+function checkDeptHrSelected(containerId, wrapId) {
+  const deptHrRole = rolesCache.find(r => r.name === 'department_hr');
+  if (!deptHrRole) return;
+  const cb = document.querySelector(`#${containerId} input[value="${deptHrRole.id}"]`);
+  const wrap = document.getElementById(wrapId);
+  if (wrap) {
+    wrap.style.display = (cb && cb.checked) ? 'block' : 'none';
+  }
+}
+
 // ---------- New user ----------
 function openUserForm() {
   document.getElementById('user-form').reset();
   document.querySelectorAll('#uf-roles-list .role-checkbox').forEach(cb => { cb.checked = false; });
+  document.getElementById('uf-dept-wrap').style.display = 'none';
 
   const photoContainer = document.getElementById('uf-photo-container');
   if (photoContainer && typeof CameraWidget !== 'undefined') {
@@ -108,6 +121,11 @@ function openUserForm() {
       previewImgId: 'uf-photo-preview',
     });
   }
+
+  // Attach listener to role checkboxes in uf-roles-list
+  document.querySelectorAll('#uf-roles-list .role-checkbox').forEach(cb => {
+    cb.onchange = () => checkDeptHrSelected('uf-roles-list', 'uf-dept-wrap');
+  });
 
   document.getElementById('user-modal-backdrop').classList.add('visible');
 }
@@ -127,6 +145,7 @@ document.getElementById('user-form').addEventListener('submit', async (e) => {
     full_name: document.getElementById('uf-full-name').value.trim(),
     physician_id: document.getElementById('uf-physician').value || null,
     role_ids: roleIds,
+    department: document.getElementById('uf-department').value || null,
     photo_url: photoInput ? photoInput.value : null,
   };
   if (!roleIds.length) { UI.toast('Assign at least one role.', 'danger'); return; }
@@ -158,6 +177,7 @@ function openUserEdit(id) {
   document.getElementById('ue-password').value = '';
   document.getElementById('ue-full-name').value = u.full_name || '';
   document.getElementById('ue-physician').value = u.physician_id || '';
+  document.getElementById('ue-department').value = u.department || '';
   document.getElementById('user-edit-notice').innerHTML = '';
 
   const roleIds = u.roles.map(r => String(r.id));
@@ -167,6 +187,12 @@ function openUserEdit(id) {
       <span>${UI.escapeHtml(r.display_name)}</span>
     </label>
   `).join('');
+
+  checkDeptHrSelected('ue-roles-list', 'ue-dept-wrap');
+
+  document.querySelectorAll('#ue-roles-list .ue-role-checkbox').forEach(cb => {
+    cb.onchange = () => checkDeptHrSelected('ue-roles-list', 'ue-dept-wrap');
+  });
 
   const isBuiltInAdmin = u.username === 'admin';
   const toggleBtn = document.getElementById('ue-toggle-active-btn');
@@ -191,6 +217,7 @@ document.getElementById('user-edit-form').addEventListener('submit', async (e) =
     full_name: document.getElementById('ue-full-name').value.trim(),
     physician_id: document.getElementById('ue-physician').value || null,
     role_ids: roleIds,
+    department: document.getElementById('ue-department').value || null,
   };
   if (newPassword) payload.password = newPassword;
   try {

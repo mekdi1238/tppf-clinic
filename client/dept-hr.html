@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Department HR Portal · TPPF Clinic</title>
+<link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" id="page-content">
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+          <div>
+            <h2 style="margin:0; font-size:20px; font-weight:700; color:var(--color-text-heading, #0A4F49);">Department HR Portal</h2>
+            <p class="text-muted" style="margin:4px 0 0 0; font-size:13px;" id="dept-hr-subtitle">Dispatch staff for medical checkups and view employee sick leave certificates.</p>
+          </div>
+          <div id="dept-badge-container"></div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div style="display:flex; gap:10px; border-bottom:1px solid var(--color-border); margin-bottom:20px;">
+          <button type="button" class="btn btn-ghost" id="tab-btn-dispatch" style="font-weight:700; border-bottom:2px solid var(--color-primary); border-radius:0;">
+            <span id="dispatch-tab-icon"></span> Dispatch Staff Checkup
+          </button>
+          <button type="button" class="btn btn-ghost" id="tab-btn-sick-leaves" style="font-weight:600; color:var(--color-text-muted); border-radius:0;">
+            <span id="sick-tab-icon"></span> Department Sick Leaves
+          </button>
+        </div>
+
+        <!-- Section 1: Staff Checkup Dispatch -->
+        <div id="section-dispatch">
+          <div class="page-toolbar">
+            <div class="toolbar-filters">
+              <div class="search-box">
+                <span id="search-icon-slot"></span>
+                <input type="text" id="staff-search-input" placeholder="Search department staff by name, code, or phone…" />
+              </div>
+              <select class="select-filter" id="dept-filter-select">
+                <option value="all">All departments</option>
+                <option value="Medical">Medical</option>
+                <option value="Finance">Finance</option>
+                <option value="Human Resource Management">Human Resource Management</option>
+                <option value="Planning and Budget Service">Planning and Budget Service</option>
+                <option value="Product Quality Control Service">Product Quality Control Service</option>
+                <option value="Production and Technic">Production and Technic</option>
+                <option value="Property Management">Property Management</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="staff-table-region"></div>
+        </div>
+
+        <!-- Section 2: Department Sick Leaves -->
+        <div id="section-sick-leaves" style="display:none;">
+          <div class="page-toolbar">
+            <div class="toolbar-filters">
+              <div class="search-box">
+                <span id="sick-search-icon-slot"></span>
+                <input type="text" id="sick-search-input" placeholder="Search sick leaves by employee name or code…" />
+              </div>
+            </div>
+          </div>
+
+          <div id="sick-leaves-table-region"></div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Dispatch Checkup Modal -->
+  <div class="modal-backdrop" id="dispatch-modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2>Dispatch Staff for Checkup</h2>
+          <p>Create a checkup visit for medical examination.</p>
+        </div>
+        <button class="icon-btn" id="dispatch-modal-close"></button>
+      </div>
+      <form id="dispatch-form">
+        <div class="modal-body">
+          <input type="hidden" id="df-patient-id" />
+          <div class="form-grid">
+            <div class="field span-2">
+              <label>Staff Member</label>
+              <input type="text" id="df-staff-name" readonly style="background:var(--color-bg-secondary); font-weight:700;" />
+            </div>
+            <div class="field">
+              <label>Department</label>
+              <input type="text" id="df-staff-dept" readonly style="background:var(--color-bg-secondary);" />
+            </div>
+            <div class="field">
+              <label>Position</label>
+              <input type="text" id="df-staff-pos" readonly style="background:var(--color-bg-secondary);" />
+            </div>
+            <div class="field span-2">
+              <label for="df-reason">Reason for Checkup / Complaint</label>
+              <textarea id="df-reason" rows="3" required placeholder="Describe the reason for medical checkup dispatch (e.g. Annual routine checkup, occupational health assessment, feeling unwell)..."></textarea>
+            </div>
+          </div>
+          <div class="notice notice-info" style="margin-top:14px;">
+            <span id="notice-icon-slot"></span>
+            <span>Submitting this form creates a checkup visit. The employee can now present themselves at the clinic for physician examination. For confidentiality, clinical diagnosis remains restricted to attending medical staff.</span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="dispatch-form-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="dispatch-form-submit">Create Checkup Visit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- View Sick Leave Certificate Modal -->
+  <div class="modal-backdrop" id="sick-cert-modal-backdrop">
+    <div class="modal modal-wide" style="max-width: 680px;">
+      <div class="modal-header">
+        <div>
+          <h2>Sick Leave Certificate</h2>
+          <p>Official medical leave justification record.</p>
+        </div>
+        <button class="icon-btn" id="sick-cert-modal-close"></button>
+      </div>
+      <div class="modal-body" id="sick-cert-modal-body"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="sick-cert-modal-cancel">Close</button>
+        <button type="button" class="btn btn-primary" onclick="window.print()">Print Certificate</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/dept-hr.js"></script>
+</body>
+</html>

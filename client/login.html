@@ -62,12 +62,15 @@
       const allowed = RoleGuard.allowedNavKeys();
       let landing = 'dashboard.html';
       if (allowed) {
-        if (allowed.includes('dashboard')) {
+        if (allowed.includes('dept-hr')) {
+          landing = 'dept-hr.html';
+        } else if (allowed.includes('dashboard')) {
           landing = 'dashboard.html';
         } else if (allowed.includes('reports')) {
           landing = 'reports.html';
         } else if (allowed[0]) {
           const keyToPage = {
+            'dept-hr': 'dept-hr.html',
             'patients': 'patients.html',
             'visits': 'visits.html',
             'admissions': 'admissions.html',
@@ -81,7 +84,7 @@
             'backup': 'backup.html',
             'settings': 'settings.html',
           };
-          landing = keyToPage[allowed[0]] || 'dashboard.html';
+          landing = keyToPage[allowed[0]] || `${allowed[0]}.html`;
         }
       }
       return landing;

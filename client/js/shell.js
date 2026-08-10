@@ -26,6 +26,7 @@ const NAV_SECTIONS = [
   {
     label: 'Pre-Employment',
     items: [
+      { key: 'dept-hr', label: 'Dept HR Portal', icon: 'building', href: 'dept-hr.html', active: true },
       { key: 'employee-registrations', label: 'Employee Registrations', icon: 'employees', href: 'registrations.html', active: true },
       { key: 'certifications', label: 'Certifications', icon: 'filecheck', href: 'certifications.html', active: true },
     ],

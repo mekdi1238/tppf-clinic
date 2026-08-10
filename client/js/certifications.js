@@ -39,6 +39,13 @@ async function loadLookups() {
   } else {
     regSelect.innerHTML = `<option value="">Select a candidate…</option>` +
       certifiableRegs.map(r => `<option value="${r.id}" data-status="${r.status}">${UI.escapeHtml(r.full_name)} — ${r.registration_code}</option>`).join('');
+
+    const candidateOptions = certifiableRegs.map(r => ({
+      value: r.id,
+      label: `${r.full_name} (${r.registration_code})`,
+      sublabel: `${r.occupation || ''} · ${r.department || 'General'}`
+    }));
+    UI.makeSearchableSelect(regSelect, candidateOptions, 'Search candidate by name or code…');
   }
 }
 

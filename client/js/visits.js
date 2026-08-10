@@ -36,6 +36,14 @@ async function loadLookups() {
   const patientSelect = document.getElementById('vf-patient');
   patientSelect.innerHTML = `<option value="">Select a patient…</option>` +
     patientsCache.filter(p => p.is_active).map(p => `<option value="${p.id}">${UI.escapeHtml(p.full_name)} — ${p.patient_code}</option>`).join('');
+  
+  const patientOptions = patientsCache.filter(p => p.is_active).map(p => ({
+    value: p.id,
+    label: `${p.full_name} (${p.patient_code})`,
+    sublabel: `${p.department || 'General'} · ${p.phone || ''}`
+  }));
+  UI.makeSearchableSelect(patientSelect, patientOptions, 'Search patient by name or code…');
+
   const physSelect = document.getElementById('vf-physician');
   physSelect.innerHTML = `<option value="">Select a physician…</option>` +
     physiciansCache.map(p => `<option value="${p.id}">${UI.escapeHtml(p.full_name)}</option>`).join('');
@@ -185,9 +193,19 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
 
   document.getElementById('visit-detail-body').innerHTML = `
     <div class="detail-section">
-      <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px; flex-wrap:wrap;">
         ${UI.visitStatusBadge(v.status)}
-        <span class="text-muted" style="font-size:12px;">Attending: ${UI.escapeHtml(v.physician ? v.physician.full_name : '—')}</span>
+        <div style="display:inline-flex; align-items:center; gap:6px; background:var(--color-bg-secondary); padding:4px 8px; border-radius:6px; border:1px solid var(--color-border-subtle);">
+          <span class="text-muted" style="font-size:12px; font-weight:600;">Attending Physician:</span>
+          ${v.status !== 'closed' ? `
+            <select id="vd-physician-select" class="select-filter" style="padding:2px 6px; font-size:12px; height:26px;">
+              ${physiciansCache.map(p => `<option value="${p.id}" ${v.physician && String(v.physician.id) === String(p.id) ? 'selected' : ''}>${UI.escapeHtml(p.full_name)}</option>`).join('')}
+            </select>
+            <button type="button" class="btn btn-secondary btn-sm" id="vd-change-physician-btn" style="padding:2px 8px; font-size:11px;">Change</button>
+          ` : `
+            <strong style="font-size:12px;">${UI.escapeHtml(v.physician ? v.physician.full_name : 'Unassigned')}</strong>
+          `}
+        </div>
       </div>
       <div class="detail-item" style="margin-top:10px;">
         <div class="k">Chief complaint</div>
@@ -364,6 +382,26 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
 
     <div id="vd-block-notice"></div>
   `;
+
+  const changePhysBtn = document.getElementById('vd-change-physician-btn');
+  if (changePhysBtn) {
+    changePhysBtn.addEventListener('click', async () => {
+      const newPhysId = document.getElementById('vd-physician-select').value;
+      if (!newPhysId) return;
+      changePhysBtn.disabled = true;
+      changePhysBtn.innerHTML = '<span class="spinner"></span>';
+      try {
+        await Api.visits.update(v.id, { physician_id: newPhysId });
+        UI.toast('Attending physician updated for this visit & associated orders.');
+        await openVisitDetail(v.id);
+        await loadVisits();
+      } catch (err) {
+        UI.toast(UI.errorMessage(err), 'danger');
+        changePhysBtn.disabled = false;
+        changePhysBtn.textContent = 'Change';
+      }
+    });
+  }
 
 
   if (canRecordVitals) {
