@@ -4,6 +4,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const requireAuth = require("../middleware/requireAuth");
 const requireRole = require("../middleware/requireRole");
 const { ApiError } = require("../middleware/errorHandler");
+const { logAudit } = require("../services/auditLogger");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -83,7 +84,21 @@ router.post("/visits", requireRole("receptionist", "physician", "system_administ
      RETURNING *;`,
     [patient_id, physId, chief_complaint || "Checkup Dispatch", req.user.id]
   );
-  res.status(201).json(result.rows[0]);
+  const newVisit = result.rows[0];
+
+  const patRes = await query(`SELECT full_name, patient_code FROM patients WHERE id = $1;`, [patient_id]);
+  const patName = patRes.rows[0]?.full_name || `Patient #${patient_id}`;
+
+  await logAudit(req, {
+    action: "create",
+    module: "visits",
+    tableName: "visits",
+    recordId: newVisit.id,
+    description: `Created visit #${newVisit.id} for '${patName}' (Reason: ${newVisit.chief_complaint || "Routine"})`,
+    afterData: newVisit,
+  });
+
+  res.status(201).json(newVisit);
 }));
 
 router.put("/visits/:id", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "lab_technician", "pharmacist"), asyncHandler(async (req, res) => {
@@ -123,7 +138,7 @@ router.put("/visits/:id", requireRole("receptionist", "physician", "system_admin
     }
   }
 
-  const editable = ["physician_id", "status", "chief_complaint", "examination_notes", "diagnosis", "disposition"];
+  const editable = ["physician_id", "status", "chief_complaint", "examination_notes", "diagnosis", "treatment", "disposition", "hr_note"];
   const updates = [];
   const params = [];
   for (const key of editable) {
@@ -150,7 +165,39 @@ router.put("/visits/:id", requireRole("receptionist", "physician", "system_admin
     await query(`UPDATE sick_leaves SET physician_id = $1 WHERE visit_id = $2;`, [req.body.physician_id, req.params.id]);
   }
 
-  res.json(await embedVisit(result.rows[0]));
+  const updatedVisit = result.rows[0];
+  await logAudit(req, {
+    action: "update",
+    module: "visits",
+    tableName: "visits",
+    recordId: updatedVisit.id,
+    description: `Updated visit #${updatedVisit.id} (Status: ${updatedVisit.status}${updatedVisit.diagnosis ? ', Diagnosis: ' + updatedVisit.diagnosis : ''})`,
+    beforeData: current,
+    afterData: updatedVisit,
+  });
+
+  res.json(await embedVisit(updatedVisit));
+}));
+
+router.delete("/visits/:id", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "lab_technician", "pharmacist", "department_hr"), asyncHandler(async (req, res) => {
+  const visitId = req.params.id;
+  const existing = await query(`SELECT * FROM visits WHERE id = $1;`, [visitId]);
+  const visit = existing.rows[0];
+  if (!visit) throw new ApiError(404, "visit_not_found", "Visit not found.");
+
+  await query(`DELETE FROM visits WHERE id = $1;`, [visitId]);
+
+  await logAudit(req, {
+    action: "delete",
+    module: "visits",
+    tableName: "visits",
+    recordId: visitId,
+    description: `Deleted visit #${visitId}`,
+    beforeData: visit,
+  });
+
+  res.json({ success: true, id: visitId });
 }));
 
 module.exports = router;
+

@@ -1,9 +1,10 @@
 const express = require("express");
-const { query } = require("../db/pool");
+const { query, withTransaction } = require("../db/pool");
 const asyncHandler = require("../utils/asyncHandler");
 const requireAuth = require("../middleware/requireAuth");
 const requireRole = require("../middleware/requireRole");
 const { ApiError } = require("../middleware/errorHandler");
+const { logAudit } = require("../services/auditLogger");
 
 const LAB_READ = requireRole("physician", "lab_technician", "system_administrator", "hr_admin", "department_hr");
 const LAB_ORDER = requireRole("physician", "system_administrator", "hr_admin");
@@ -54,10 +55,12 @@ router.get("/lab-orders", LAB_READ, asyncHandler(async (req, res) => {
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const result = await query(
-    `SELECT o.*, p.full_name AS patient_name, p.patient_code AS patient_code
+    `SELECT o.*, p.full_name AS patient_name, p.patient_code AS patient_code,
+            ph.full_name AS physician_full_name
      FROM lab_orders o
      JOIN visits v ON v.id = o.visit_id
      JOIN patients p ON p.id = v.patient_id
+     LEFT JOIN physicians ph ON ph.id = o.physician_id
      ${where}
      ORDER BY o.order_date DESC;`,
     params
@@ -67,13 +70,22 @@ router.get("/lab-orders", LAB_READ, asyncHandler(async (req, res) => {
 }));
 
 router.get("/lab-orders/:id", LAB_READ, asyncHandler(async (req, res) => {
-  const result = await query(`SELECT * FROM lab_orders WHERE id = $1;`, [req.params.id]);
+  const result = await query(
+    `SELECT o.*, p.full_name AS patient_name, p.patient_code AS patient_code,
+            ph.full_name AS physician_full_name
+     FROM lab_orders o
+     JOIN visits v ON v.id = o.visit_id
+     JOIN patients p ON p.id = v.patient_id
+     LEFT JOIN physicians ph ON ph.id = o.physician_id
+     WHERE o.id = $1;`,
+    [req.params.id]
+  );
   if (!result.rows[0]) throw new ApiError(404, "lab_order_not_found", "Lab order not found.");
   res.json(await embedItems(result.rows[0]));
 }));
 
 router.post("/lab-orders", LAB_ORDER, asyncHandler(async (req, res) => {
-  const { visit_id, physician_id, test_ids } = req.body;
+  const { visit_id, physician_id, test_ids, physician_note } = req.body;
   if (!visit_id) throw new ApiError(422, "visit_required", "A visit is required.");
   if (!Array.isArray(test_ids) || !test_ids.length) {
     throw new ApiError(422, "tests_required", "Select at least one test.");
@@ -84,8 +96,8 @@ router.post("/lab-orders", LAB_ORDER, asyncHandler(async (req, res) => {
   const effectivePhysicianId = physician_id || visitResult.rows[0].physician_id;
 
   const orderResult = await query(
-    `INSERT INTO lab_orders (visit_id, physician_id) VALUES ($1, $2) RETURNING *;`,
-    [visit_id, effectivePhysicianId]
+    `INSERT INTO lab_orders (visit_id, physician_id, physician_note) VALUES ($1, $2, $3) RETURNING *;`,
+    [visit_id, effectivePhysicianId, physician_note || null]
   );
   const order = orderResult.rows[0];
 
@@ -96,7 +108,29 @@ router.post("/lab-orders", LAB_ORDER, asyncHandler(async (req, res) => {
     );
   }
 
-  res.status(201).json(await embedItems(order));
+  const fresh = await query(
+    `SELECT o.*, p.full_name AS patient_name, p.patient_code AS patient_code,
+            ph.full_name AS physician_full_name
+     FROM lab_orders o
+     JOIN visits v ON v.id = o.visit_id
+     JOIN patients p ON p.id = v.patient_id
+     LEFT JOIN physicians ph ON ph.id = o.physician_id
+     WHERE o.id = $1;`,
+    [order.id]
+  );
+
+  const embedded = await embedItems(fresh.rows[0]);
+
+  await logAudit(req, {
+    action: "create",
+    module: "laboratory",
+    tableName: "lab_orders",
+    recordId: order.id,
+    description: `Created Lab Order #${order.id} for Visit #${visit_id} with ${test_ids.length} test(s)`,
+    afterData: embedded,
+  });
+
+  res.status(201).json(embedded);
 }));
 
 router.put("/lab-orders/:id", LAB_RESULTS, asyncHandler(async (req, res) => {
@@ -104,7 +138,7 @@ router.put("/lab-orders/:id", LAB_RESULTS, asyncHandler(async (req, res) => {
   const order = current.rows[0];
   if (!order) throw new ApiError(404, "lab_order_not_found", "Lab order not found.");
 
-  const { status } = req.body;
+  const { status, technician_note } = req.body;
   if (status && status !== order.status) {
     const allowed = LAB_ORDER_TRANSITIONS[order.status] || [];
     if (!allowed.includes(status)) {
@@ -126,11 +160,41 @@ router.put("/lab-orders/:id", LAB_RESULTS, asyncHandler(async (req, res) => {
     }
   }
 
-  const result = await query(
-    `UPDATE lab_orders SET status = $1 WHERE id = $2 RETURNING *;`,
-    [status || order.status, req.params.id]
+  const noteValue = technician_note !== undefined ? (technician_note || null) : order.technician_note;
+  const techName = (req.user && req.user.full_name) ? req.user.full_name : order.technician_name;
+  await query(
+    `UPDATE lab_orders
+     SET status = $1,
+         technician_note = $2,
+         technician_name = COALESCE($3, technician_name)
+     WHERE id = $4;`,
+    [status || order.status, noteValue, techName, req.params.id]
   );
-  res.json(await embedItems(result.rows[0]));
+
+  const fresh = await query(
+    `SELECT o.*, p.full_name AS patient_name, p.patient_code AS patient_code,
+            ph.full_name AS physician_full_name
+     FROM lab_orders o
+     JOIN visits v ON v.id = o.visit_id
+     JOIN patients p ON p.id = v.patient_id
+     LEFT JOIN physicians ph ON ph.id = o.physician_id
+     WHERE o.id = $1;`,
+    [req.params.id]
+  );
+
+  const embedded = await embedItems(fresh.rows[0]);
+
+  await logAudit(req, {
+    action: "update",
+    module: "laboratory",
+    tableName: "lab_orders",
+    recordId: Number(req.params.id),
+    description: `Updated Lab Order #${req.params.id} status to '${status || order.status}'`,
+    beforeData: order,
+    afterData: embedded,
+  });
+
+  res.json(embedded);
 }));
 
 router.put("/lab-orders/:orderId/items/:itemId", LAB_RESULTS, asyncHandler(async (req, res) => {
@@ -152,4 +216,27 @@ router.put("/lab-orders/:orderId/items/:itemId", LAB_RESULTS, asyncHandler(async
   res.json(result.rows[0]);
 }));
 
+router.delete("/lab-orders/:id", requireRole("physician", "lab_technician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
+  const orderId = req.params.id;
+  const existing = await query(`SELECT * FROM lab_orders WHERE id = $1;`, [orderId]);
+  if (!existing.rows[0]) throw new ApiError(404, "lab_order_not_found", "Lab order not found.");
+
+  await withTransaction(async (client) => {
+    await client.query(`DELETE FROM lab_order_items WHERE lab_order_id = $1;`, [orderId]);
+    await client.query(`DELETE FROM lab_orders WHERE id = $1;`, [orderId]);
+  });
+
+  await logAudit(req, {
+    action: "delete",
+    module: "laboratory",
+    tableName: "lab_orders",
+    recordId: Number(orderId),
+    description: `Deleted Lab Order #${orderId}`,
+    beforeData: existing.rows[0],
+  });
+
+  res.json({ success: true, id: orderId });
+}));
+
 module.exports = router;
+

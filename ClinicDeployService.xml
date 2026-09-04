@@ -1,0 +1,33 @@
+<service>
+  <!-- Unique internal service ID -->
+  <id>ClinicManagmentDeploy</id>
+  
+  <!-- Display name shown in Windows services.msc -->
+  <name>TPPF Clinic Management System</name>
+  
+  <!-- Description shown in Windows services.msc -->
+  <description>TPPF Clinic Management System - 24/7 background Node.js web server.</description>
+  
+  <!-- Command configuration: Runs Node.js directly from the application folder -->
+  <executable>node.exe</executable>
+  <arguments>server/src/server.js</arguments>
+  <workingdirectory>C:\Applications\ClinicManagmentSystem</workingdirectory>
+  
+  <!-- Startup options: Start automatically on boot before any user logs in -->
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  
+  <!-- Auto-restart crash recovery: restarts in 5 seconds if stopped or crashed -->
+  <onfailure action="restart" delay="5 sec" />
+  <resetfailure>1 hour</resetfailure>
+  
+  <!-- Logging configuration (Auto-rolling log files) -->
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>5</keepFiles>
+  </log>
+  
+  <!-- Environment variables -->
+  <env name="NODE_ENV" value="production" />
+  <env name="PORT" value="3000" />
+</service>

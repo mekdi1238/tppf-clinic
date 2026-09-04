@@ -15,7 +15,11 @@ const referralsRoutes = require("./routes/referralsAndSickLeaves");
 const usersRoutes = require("./routes/users");
 const settingsRoutes = require("./routes/settings");
 const backupsRoutes = require("./routes/backups");
+const checkupsRoutes = require("./routes/checkups");
 const staffRoutes = require("./routes/staff");
+const auditLogsRoutes = require("./routes/auditLogs");
+const departmentsRoutes = require("./routes/departments");
+const auditMiddleware = require("./middleware/auditMiddleware");
 const notFound = require("./middleware/notFound");
 const { errorHandler } = require("./middleware/errorHandler");
 
@@ -26,7 +30,9 @@ const { errorHandler } = require("./middleware/errorHandler");
 function createApp() {
   const app = express();
 
-  app.use(express.json());
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+  app.use(auditMiddleware);
 
   app.use("/api", healthRoutes);
   app.use("/api/v1", authRoutes);
@@ -44,6 +50,9 @@ function createApp() {
   app.use("/api/v1", staffRoutes);
   app.use("/api/v1", settingsRoutes);
   app.use("/api/v1", backupsRoutes);
+  app.use("/api/v1", checkupsRoutes);
+  app.use("/api/v1", auditLogsRoutes);
+  app.use("/api/v1", departmentsRoutes);
 
   // Prevent browser from caching HTML pages (kills bfcache for protected pages).
   // This forces the browser to re-fetch pages on Back/Forward navigation,

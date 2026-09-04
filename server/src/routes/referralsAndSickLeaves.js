@@ -4,6 +4,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const requireAuth = require("../middleware/requireAuth");
 const requireRole = require("../middleware/requireRole");
 const { ApiError } = require("../middleware/errorHandler");
+const { logAudit } = require("../services/auditLogger");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -24,9 +25,27 @@ router.get("/referrals", requireRole("physician", "system_administrator", "hr_ad
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const result = await query(
-    `SELECT r.*, p.full_name AS patient_name, p.patient_code AS patient_code
+    `SELECT r.*,
+            p.full_name AS patient_name,
+            p.patient_code AS patient_code,
+            p.gender AS patient_gender,
+            p.date_of_birth AS patient_dob,
+            p.phone AS patient_phone,
+            p.location AS patient_location,
+            p.address AS patient_address,
+            COALESCE(p.department, er.department) AS patient_department,
+            COALESCE(p.position, er.position) AS patient_position,
+            ph.full_name AS physician_name,
+            ph.qualification AS physician_qualification,
+            ph.license_no AS physician_license_no,
+            v.treatment AS visit_treatment,
+            v.chief_complaint AS visit_chief_complaint,
+            v.examination_notes AS visit_exam_notes
      FROM referrals r
      JOIN patients p ON p.id = r.patient_id
+     LEFT JOIN employee_registrations er ON er.id = p.source_employee_registration_id
+     LEFT JOIN physicians ph ON ph.id = r.physician_id
+     LEFT JOIN visits v ON v.id = r.visit_id
      ${where}
      ORDER BY r.referral_date DESC;`,
     params
@@ -36,9 +55,27 @@ router.get("/referrals", requireRole("physician", "system_administrator", "hr_ad
 
 router.get("/referrals/:id", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const result = await query(
-    `SELECT r.*, p.full_name AS patient_name, p.patient_code AS patient_code
+    `SELECT r.*,
+            p.full_name AS patient_name,
+            p.patient_code AS patient_code,
+            p.gender AS patient_gender,
+            p.date_of_birth AS patient_dob,
+            p.phone AS patient_phone,
+            p.location AS patient_location,
+            p.address AS patient_address,
+            COALESCE(p.department, er.department) AS patient_department,
+            COALESCE(p.position, er.position) AS patient_position,
+            ph.full_name AS physician_name,
+            ph.qualification AS physician_qualification,
+            ph.license_no AS physician_license_no,
+            v.treatment AS visit_treatment,
+            v.chief_complaint AS visit_chief_complaint,
+            v.examination_notes AS visit_exam_notes
      FROM referrals r
      JOIN patients p ON p.id = r.patient_id
+     LEFT JOIN employee_registrations er ON er.id = p.source_employee_registration_id
+     LEFT JOIN physicians ph ON ph.id = r.physician_id
+     LEFT JOIN visits v ON v.id = r.visit_id
      WHERE r.id = $1;`,
     [req.params.id]
   );
@@ -63,7 +100,19 @@ router.post("/referrals", requireRole("physician", "system_administrator", "hr_a
      RETURNING *;`,
     [visit_id, visitResult.rows[0].patient_id, effectivePhysicianId, diagnosis || null, reason || null, referred_to.trim(), note || null]
   );
-  res.status(201).json(result.rows[0]);
+
+  const referral = result.rows[0];
+
+  await logAudit(req, {
+    action: "create",
+    module: "referrals",
+    tableName: "referrals",
+    recordId: referral.id,
+    description: `Created medical referral #${referral.id} to '${referred_to.trim()}' for Patient #${visitResult.rows[0].patient_id}`,
+    afterData: referral,
+  });
+
+  res.status(201).json(referral);
 }));
 
 async function processExpiredSickLeaves() {
@@ -118,7 +167,8 @@ router.get("/sick-leaves", requireRole("physician", "system_administrator", "hr_
   }
 
   const userDept = req.user && req.user.department ? req.user.department : null;
-  const targetDept = department || userDept;
+  const isManager = userDept && userDept.toLowerCase() === "manager";
+  const targetDept = department || (isManager ? "all" : userDept);
   if (targetDept && targetDept !== "all") {
     params.push(targetDept);
     params.push(req.user.id);
@@ -129,10 +179,20 @@ router.get("/sick-leaves", requireRole("physician", "system_administrator", "hr_
   const result = await query(
     `SELECT s.*,
             (GREATEST(1, s.leave_end::date - s.leave_start::date + 1)) AS days,
-            p.full_name AS patient_name, p.patient_code AS patient_code,
+            p.full_name AS patient_name,
+            p.patient_code AS patient_code,
+            p.gender AS patient_gender,
+            p.date_of_birth AS patient_dob,
+            p.phone AS patient_phone,
+            p.location AS patient_location,
+            p.address AS patient_address,
             COALESCE(p.department, er.department) AS department,
             COALESCE(p.position, er.position) AS position,
-            ph.full_name AS physician_name
+            ph.full_name AS physician_name,
+            ph.qualification AS physician_qualification,
+            ph.license_no AS physician_license_no,
+            v.treatment AS visit_treatment,
+            v.examination_notes AS visit_exam_notes
      FROM sick_leaves s
      JOIN patients p ON p.id = s.patient_id
      LEFT JOIN employee_registrations er ON er.id = p.source_employee_registration_id
@@ -149,13 +209,24 @@ router.get("/sick-leaves/:id", requireRole("physician", "system_administrator", 
   const result = await query(
     `SELECT s.*,
             (GREATEST(1, s.leave_end::date - s.leave_start::date + 1)) AS days,
-            p.full_name AS patient_name, p.patient_code AS patient_code,
+            p.full_name AS patient_name,
+            p.patient_code AS patient_code,
+            p.gender AS patient_gender,
+            p.date_of_birth AS patient_dob,
+            p.phone AS patient_phone,
+            p.location AS patient_location,
+            p.address AS patient_address,
             COALESCE(p.department, er.department) AS department,
             COALESCE(p.position, er.position) AS position,
-            ph.full_name AS physician_name
+            ph.full_name AS physician_name,
+            ph.qualification AS physician_qualification,
+            ph.license_no AS physician_license_no,
+            v.treatment AS visit_treatment,
+            v.examination_notes AS visit_exam_notes
      FROM sick_leaves s
      JOIN patients p ON p.id = s.patient_id
      LEFT JOIN employee_registrations er ON er.id = p.source_employee_registration_id
+     LEFT JOIN visits v ON v.id = s.visit_id
      LEFT JOIN physicians ph ON ph.id = s.physician_id
      WHERE s.id = $1;`,
     [req.params.id]
@@ -180,7 +251,58 @@ router.post("/sick-leaves", requireRole("physician", "system_administrator", "hr
      RETURNING *;`,
     [visit_id, visitResult.rows[0].patient_id, effectivePhysicianId, diagnosis || null, exam_date || null, leave_start, leave_end]
   );
-  res.status(201).json(result.rows[0]);
+
+  const sickLeave = result.rows[0];
+
+  await logAudit(req, {
+    action: "create",
+    module: "referrals",
+    tableName: "sick_leaves",
+    recordId: sickLeave.id,
+    description: `Created medical sick leave #${sickLeave.id} (${leave_start} to ${leave_end}) for Patient #${visitResult.rows[0].patient_id}`,
+    afterData: sickLeave,
+  });
+
+  res.status(201).json(sickLeave);
+}));
+
+router.delete("/referrals/:id", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
+  const referralId = req.params.id;
+  const existing = await query(`SELECT * FROM referrals WHERE id = $1;`, [referralId]);
+  if (!existing.rows[0]) throw new ApiError(404, "referral_not_found", "Referral not found.");
+
+  await query(`DELETE FROM referrals WHERE id = $1;`, [referralId]);
+
+  await logAudit(req, {
+    action: "delete",
+    module: "referrals",
+    tableName: "referrals",
+    recordId: Number(referralId),
+    description: `Deleted referral #${referralId}`,
+    beforeData: existing.rows[0],
+  });
+
+  res.json({ success: true, id: referralId });
+}));
+
+router.delete("/sick-leaves/:id", requireRole("physician", "system_administrator", "hr_admin", "department_hr"), asyncHandler(async (req, res) => {
+  const sickLeaveId = req.params.id;
+  const existing = await query(`SELECT * FROM sick_leaves WHERE id = $1;`, [sickLeaveId]);
+  if (!existing.rows[0]) throw new ApiError(404, "sick_leave_not_found", "Sick leave not found.");
+
+  await query(`DELETE FROM sick_leaves WHERE id = $1;`, [sickLeaveId]);
+
+  await logAudit(req, {
+    action: "delete",
+    module: "referrals",
+    tableName: "sick_leaves",
+    recordId: Number(sickLeaveId),
+    description: `Deleted sick leave #${sickLeaveId}`,
+    beforeData: existing.rows[0],
+  });
+
+  res.json({ success: true, id: sickLeaveId });
 }));
 
 module.exports = router;
+

@@ -7,8 +7,10 @@
     "migrate:up": "node db/migrate.js up",
     "migrate:down": "node db/migrate.js down",
     "migrate:status": "node db/migrate.js status",
+    "sort-departments": "node db/sort_departments.js",
     "seed": "node db/seed.js",
     "dev": "node server/src/server.js"
+
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -40,7 +40,10 @@ router.get("/dashboard/stats", asyncHandler(async (req, res) => {
   });
 }));
 
+const { syncPhysicians } = require("../services/physicianSync");
+
 router.get("/physicians", asyncHandler(async (req, res) => {
+  await syncPhysicians();
   const result = await query(
     `SELECT id, full_name, gender, date_recruited, license_no, qualification, photo_url, is_active
      FROM physicians WHERE is_active = true ORDER BY full_name;`

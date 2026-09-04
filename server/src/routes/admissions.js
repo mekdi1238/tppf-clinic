@@ -4,6 +4,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const requireAuth = require("../middleware/requireAuth");
 const requireRole = require("../middleware/requireRole");
 const { ApiError } = require("../middleware/errorHandler");
+const { logAudit } = require("../services/auditLogger");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -80,7 +81,19 @@ router.post("/admissions", requireRole("physician", "system_administrator", "hr_
      RETURNING *;`,
     [visit_id, visit.patient_id, admitting_physician_id || null, reason || ""]
   );
-  res.status(201).json(result.rows[0]);
+
+  const admission = result.rows[0];
+
+  await logAudit(req, {
+    action: "create",
+    module: "admissions",
+    tableName: "admissions",
+    recordId: admission.id,
+    description: `Admitted patient #${visit.patient_id} (Admission #${admission.id}, Visit #${visit_id})`,
+    afterData: admission,
+  });
+
+  res.status(201).json(admission);
 }));
 
 router.post("/admissions/:id/notes", requireRole("physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
@@ -96,6 +109,16 @@ router.post("/admissions/:id/notes", requireRole("physician", "system_administra
      RETURNING *;`,
     [req.params.id, note.trim(), req.user ? req.user.id : null]
   );
+
+  await logAudit(req, {
+    action: "update",
+    module: "admissions",
+    tableName: "admission_notes",
+    recordId: Number(req.params.id),
+    description: `Added clinical progress note to Admission #${req.params.id}`,
+    afterData: result.rows[0],
+  });
+
   res.status(201).json(result.rows[0]);
 }));
 
@@ -114,6 +137,17 @@ router.post("/admissions/:id/discharge", requireRole("physician", "system_admini
      RETURNING *;`,
     [req.body.discharge_notes || "", req.params.id]
   );
+
+  await logAudit(req, {
+    action: "update",
+    module: "admissions",
+    tableName: "admissions",
+    recordId: Number(req.params.id),
+    description: `Discharged patient for Admission #${req.params.id}`,
+    beforeData: admission,
+    afterData: result.rows[0],
+  });
+
   res.json(result.rows[0]);
 }));
 

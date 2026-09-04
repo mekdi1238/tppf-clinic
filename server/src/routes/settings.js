@@ -3,6 +3,7 @@ const { query } = require("../db/pool");
 const asyncHandler = require("../utils/asyncHandler");
 const requireAuth = require("../middleware/requireAuth");
 const requireRole = require("../middleware/requireRole");
+const { logAudit } = require("../services/auditLogger");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -22,6 +23,7 @@ router.get("/settings", asyncHandler(async (req, res) => {
 
 router.put("/settings", requireRole("system_administrator"), asyncHandler(async (req, res) => {
   const { clinic_name, clinic_tagline, clinic_address, clinic_phone } = req.body;
+  const current = await query(`SELECT * FROM clinic_settings WHERE id = 1;`);
 
   const result = await query(
     `INSERT INTO clinic_settings (id, clinic_name, clinic_tagline, clinic_address, clinic_phone, updated_at)
@@ -40,6 +42,16 @@ router.put("/settings", requireRole("system_administrator"), asyncHandler(async 
       clinic_phone || "",
     ]
   );
+
+  await logAudit(req, {
+    action: "update",
+    module: "settings",
+    tableName: "clinic_settings",
+    recordId: 1,
+    description: `Updated clinic settings ('${clinic_name || "TPPF Clinic"}')`,
+    beforeData: current.rows[0] || null,
+    afterData: result.rows[0],
+  });
 
   res.json(result.rows[0]);
 }));

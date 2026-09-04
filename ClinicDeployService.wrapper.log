@@ -1,0 +1,11 @@
+2026-08-27 09:12:25,904 DEBUG - Starting WinSW in console mode
+2026-08-27 09:12:27,507 FATAL - An error occurred trying to start process 'D:\tppf-clinic\ClinicDeployService.exe' with working directory 'D:\tppf-clinic'. The request is not supported.
+System.ComponentModel.Win32Exception (50): An error occurred trying to start process 'D:\tppf-clinic\ClinicDeployService.exe' with working directory 'D:\tppf-clinic'. The request is not supported.
+   at System.Diagnostics.Process.StartWithShellExecuteEx(ProcessStartInfo )
+   at System.Diagnostics.Process.StartCore(ProcessStartInfo )
+   at System.Diagnostics.Process.Start()
+   at System.Diagnostics.Process.Start(ProcessStartInfo )
+   at WinSW.Program.<Run>g__Elevate|5_9()
+   at WinSW.Program.<Run>g__Install|5_0(<>c__DisplayClass5_0& )
+   at WinSW.Program.Run(String[] argsArray, IServiceConfig config)
+   at WinSW.Program.Main(String[] args)

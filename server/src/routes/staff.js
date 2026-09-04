@@ -59,4 +59,50 @@ router.get("/staff/:id", requireRole("receptionist", "physician", "system_admini
   res.json(result.rows[0]);
 }));
 
+// GET /staff/:id/medical-record — comprehensive HR view for an employee
+router.get("/staff/:id/medical-record", requireRole("system_administrator", "hr_admin", "department_hr"), asyncHandler(async (req, res) => {
+  const patientId = req.params.id;
+
+  // 1. Patient info & checkup status
+  const patientResult = await query(
+    `SELECT id, full_name, patient_code, department, position, is_active, 
+            last_fitness_exam_date, next_checkup_due_date, fitness_status,
+            (next_checkup_due_date - CURRENT_DATE) AS days_remaining
+     FROM patients WHERE id = $1;`,
+    [patientId]
+  );
+  const patient = patientResult.rows[0];
+  if (!patient) return res.status(404).json({ code: "patient_not_found", message: "Patient not found." });
+
+  // 2. Active/Recent Sick Leaves (last 365 days or active)
+  const sickLeavesResult = await query(
+    `SELECT sl.*, ph.full_name as physician_name
+     FROM sick_leaves sl
+     LEFT JOIN physicians ph ON sl.physician_id = ph.id
+     WHERE sl.patient_id = $1 
+       AND sl.leave_start >= CURRENT_DATE - INTERVAL '365 days'
+     ORDER BY sl.leave_start DESC;`,
+    [patientId]
+  );
+
+  // 3. Physician Advice Notes (hr_note is not null)
+  const notesResult = await query(
+    `SELECT v.id, v.visit_date, v.hr_note, v.chief_complaint, ph.full_name as physician_name
+     FROM visits v
+     LEFT JOIN physicians ph ON v.physician_id = ph.id
+     WHERE v.patient_id = $1 
+       AND v.hr_note IS NOT NULL 
+       AND v.hr_note != ''
+     ORDER BY v.visit_date DESC
+     LIMIT 50;`,
+    [patientId]
+  );
+
+  res.json({
+    patient,
+    sick_leaves: sickLeavesResult.rows,
+    hr_notes: notesResult.rows
+  });
+}));
+
 module.exports = router;

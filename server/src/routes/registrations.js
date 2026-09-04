@@ -4,8 +4,10 @@ const asyncHandler = require("../utils/asyncHandler");
 const requireAuth = require("../middleware/requireAuth");
 const requireRole = require("../middleware/requireRole");
 const { ApiError } = require("../middleware/errorHandler");
+const { resolveDepartment } = require("../utils/departmentSorter");
 
 const router = express.Router();
+
 router.use(requireAuth);
 
 // Only hr_admin and physician can accept a candidate as staff
@@ -71,6 +73,8 @@ router.get("/registrations/:id", requireRole("receptionist", "physician", "syste
   });
 }));
 
+const { syncPhysicians } = require("../services/physicianSync");
+
 router.post("/registrations", requireRole("receptionist", "physician", "system_administrator", "hr_admin"), asyncHandler(async (req, res) => {
   const { full_name, occupation, date_of_birth, gender, location, photo_url, department, position } = req.body;
   if (!full_name || !full_name.trim()) {
@@ -92,6 +96,7 @@ router.post("/registrations", requireRole("receptionist", "physician", "system_a
      RETURNING *;`,
     [full_name.trim(), date_of_birth || null, gender || null, location || "", occupation.trim(), photo_url || null, department.trim(), position.trim()]
   );
+  await syncPhysicians();
   res.status(201).json(result.rows[0]);
 }));
 
@@ -124,15 +129,80 @@ router.put("/registrations/:id", requireRole("receptionist", "physician", "syste
     `UPDATE employee_registrations SET ${updates.join(", ")} WHERE id = $${params.length} RETURNING *;`,
     params
   );
+
+  if (req.body.status !== undefined) {
+    if (req.body.status === 'withdrawn') {
+      await query(`UPDATE patients SET is_active = false WHERE source_employee_registration_id = $1;`, [req.params.id]);
+    } else if (current.status === 'withdrawn' && result.rows[0].status !== 'withdrawn') {
+      // Restoring registration — if candidate was accepted as staff, reactivate patient
+      if (result.rows[0].status === 'accepted_as_staff') {
+        await query(`UPDATE patients SET is_active = true WHERE source_employee_registration_id = $1;`, [req.params.id]);
+      }
+    }
+  }
+
+  await syncPhysicians();
   res.json(result.rows[0]);
+}));
+
+// POST /registrations/:id/create-visit
+// Creates a temporary patient (S ID) if needed and opens a Visit for Medical Examination
+router.post("/registrations/:id/create-visit", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "department_hr"), asyncHandler(async (req, res) => {
+  const regResult = await query(`SELECT * FROM employee_registrations WHERE id = $1;`, [req.params.id]);
+  const registration = regResult.rows[0];
+  if (!registration) throw new ApiError(404, "registration_not_found", "Registration not found.");
+
+  const { physician_id } = req.body;
+  let physId = physician_id;
+  if (!physId) {
+    const physResult = await query(`SELECT id FROM physicians WHERE is_active = true ORDER BY full_name LIMIT 1;`);
+    physId = physResult.rows[0] ? physResult.rows[0].id : null;
+  }
+
+  const result = await withTransaction(async (client) => {
+    // Check if patient already exists for this registration
+    let patResult = await client.query(`SELECT * FROM patients WHERE source_employee_registration_id = $1;`, [registration.id]);
+    let patient = patResult.rows[0];
+
+    if (!patient) {
+      // Create temporary candidate patient with S ID (inactive until accepted as staff)
+      const newPat = await client.query(
+        `INSERT INTO patients (patient_code, full_name, date_of_birth, gender, location, department, position, photo_url, source_employee_registration_id, is_active, fitness_status)
+         VALUES ('S' || lpad(nextval('patient_code_seq')::text, 3, '0'), $1, $2, $3, $4, $5, $6, $7, $8, false, 'pending')
+         RETURNING *;`,
+        [
+          registration.full_name,
+          registration.date_of_birth || null,
+          registration.gender || null,
+          registration.location || null,
+          registration.department || 'Medical',
+          registration.position || registration.occupation || 'Staff',
+          registration.photo_url || null,
+          registration.id
+        ]
+      );
+      patient = newPat.rows[0];
+    }
+
+    // Create visit for Medical Examination
+    const visitResult = await client.query(
+      `INSERT INTO visits (patient_id, physician_id, status, chief_complaint, examination_notes, created_by_user_id)
+       VALUES ($1, $2, 'open', 'Medical Examination', '', $3)
+       RETURNING *;`,
+      [patient.id, physId, req.user.id]
+    );
+
+    return { patient, visit: visitResult.rows[0] };
+  });
+
+  res.status(201).json(result);
 }));
 
 
 
 // POST /registrations/:id/accept-as-staff
-// Restricted to hr_admin and physician roles.
-// Converts a certified_fit candidate into a clinic staff member (CI-series).
-router.post("/registrations/:id/accept-as-staff", requireRole("receptionist", "physician", "system_administrator", "hr_admin"), ACCEPT_AS_STAFF_ROLES, asyncHandler(async (req, res) => {
+// Converts a certified_fit candidate into a clinic staff member.
+router.post("/registrations/:id/accept-as-staff", requireRole("receptionist", "physician", "system_administrator", "hr_admin", "department_hr"), asyncHandler(async (req, res) => {
   const regResult = await query(`SELECT * FROM employee_registrations WHERE id = $1;`, [req.params.id]);
   const registration = regResult.rows[0];
   if (!registration) throw new ApiError(404, "registration_not_found", "Registration not found.");
@@ -181,12 +251,35 @@ router.post("/registrations/:id/accept-as-staff", requireRole("receptionist", "p
       ]
     );
 
-    const patientResult = await client.query(
-      `INSERT INTO patients (patient_code, full_name, date_of_birth, gender, location, address, phone, photo_url, source_employee_registration_id)
-       VALUES ('S' || lpad(nextval('patient_code_seq')::text, 3, '0'), $1, $2, $3, $4, '', '', $5, $6)
-       RETURNING *;`,
-      [registration.full_name, registration.date_of_birth || null, registration.gender || null, registration.location || null, registration.photo_url || null, registration.id]
+    // Reuse existing candidate patient record if available, or create new patient record
+    let patientResult = await client.query(
+      `SELECT * FROM patients WHERE source_employee_registration_id = $1;`,
+      [registration.id]
     );
+
+    if (patientResult.rows[0]) {
+      // Activate existing candidate patient record (same S code)
+      const updatedPat = await client.query(
+        `UPDATE patients
+         SET is_active = true,
+             department = $1,
+             position = $2,
+             last_fitness_exam_date = COALESCE(last_fitness_exam_date, CURRENT_DATE),
+             next_checkup_due_date = COALESCE(next_checkup_due_date, (CURRENT_DATE + INTERVAL '6 months')::date)
+         WHERE id = $3
+         RETURNING *;`,
+        [registration.department, registration.position, patientResult.rows[0].id]
+      );
+      patientResult = updatedPat;
+    } else {
+      // Insert new patient record if candidate didn't have a visit prior
+      patientResult = await client.query(
+        `INSERT INTO patients (patient_code, full_name, date_of_birth, gender, location, department, position, photo_url, source_employee_registration_id, is_active, fitness_status, last_fitness_exam_date, next_checkup_due_date)
+         VALUES ('S' || lpad(nextval('patient_code_seq')::text, 3, '0'), $1, $2, $3, $4, $5, $6, $7, $8, true, 'fit', CURRENT_DATE, (CURRENT_DATE + INTERVAL '6 months')::date)
+         RETURNING *;`,
+        [registration.full_name, registration.date_of_birth || null, registration.gender || null, registration.location || null, registration.department, registration.position, registration.photo_url || null, registration.id]
+      );
+    }
 
     let physicianResult = null;
     if (registration.department === 'Medical') {
@@ -203,9 +296,9 @@ router.post("/registrations/:id/accept-as-staff", requireRole("receptionist", "p
       [registration.id]
     );
 
-    return { 
-      staff: staffResult.rows[0], 
-      patient: patientResult.rows[0], 
+    return {
+      staff: staffResult.rows[0],
+      patient: patientResult.rows[0],
       registration: updatedRegResult.rows[0],
       physician: physicianResult ? physicianResult.rows[0] : null
     };
@@ -227,11 +320,8 @@ router.post("/registrations/import", requireRole("receptionist", "physician", "s
   }
 
   const REQUIRED_FIELDS = ["full_name", "department", "position", "occupation"];
-  const VALID_DEPARTMENTS = [
-    "Medical", "Finance", "Human Resource Management",
-    "Planning and Budget Service", "Product Quality Control Service",
-    "Production and Technic", "Property Management"
-  ];
+  const deptsRes = await query(`SELECT name FROM departments;`);
+  const VALID_DEPARTMENTS = deptsRes.rows.map(r => r.name);
 
   // Validate a single row; returns an error string or null.
   function validateRow(row) {
@@ -239,7 +329,7 @@ router.post("/registrations/import", requireRole("receptionist", "physician", "s
       const val = (row[field] || "").toString().trim();
       if (!val) return `Missing required field: "${field}"`;
     }
-    if (!VALID_DEPARTMENTS.includes(row.department.trim())) {
+    if (!VALID_DEPARTMENTS.some(d => d.toLowerCase() === row.department.trim().toLowerCase())) {
       return `Invalid department "${row.department}". Must be one of: ${VALID_DEPARTMENTS.join(", ")}.`;
     }
     if (row.date_of_birth && isNaN(Date.parse(row.date_of_birth))) {
@@ -285,7 +375,7 @@ router.post("/registrations/import", requireRole("receptionist", "physician", "s
             row.location || "",
             row.occupation.trim(),
             row.photo_url || null,
-            row.department.trim(),
+            resolveDepartment(row.department.trim(), row.position || row.occupation),
             row.position.trim(),
           ]
         );
@@ -323,7 +413,7 @@ router.post("/registrations/import", requireRole("receptionist", "physician", "s
 
     // DB insert (each row its own implicit transaction so prior rows are already durable)
     try {
-      const result = await query(
+      const r = await query(
         `INSERT INTO employee_registrations
            (registration_code, full_name, date_of_birth, gender, location, occupation, photo_url, status, department, position)
          VALUES ('R' || lpad(nextval('registration_code_seq')::text, 3, '0'),
@@ -336,11 +426,11 @@ router.post("/registrations/import", requireRole("receptionist", "physician", "s
           row.location || "",
           row.occupation.trim(),
           row.photo_url || null,
-          row.department.trim(),
+          resolveDepartment(row.department.trim(), row.position || row.occupation),
           row.position.trim(),
         ]
       );
-      committed.push(result.rows[0]);
+      committed.push(r.rows[0]);
     } catch (dbErr) {
       return res.status(207).json({
         success: false,
@@ -348,7 +438,7 @@ router.post("/registrations/import", requireRole("receptionist", "physician", "s
         successCount: committed.length,
         failedRowIndex: i + 1,
         failedRow: row,
-        error: `Database error: ${dbErr.message}`,
+        error: dbErr.message || "Database insert failed.",
         remainingRows: records.slice(i),
       });
     }
