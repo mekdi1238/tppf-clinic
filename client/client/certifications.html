@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<title>Certifications · TPPF Clinic</title>
+<link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" id="page-content">
+
+        <div class="page-toolbar">
+          <div class="toolbar-filters">
+            <div class="search-box">
+              <span id="search-icon-slot"></span>
+              <input type="text" id="search-input" placeholder="Search by candidate name or code…" />
+            </div>
+            <select class="select-filter" id="result-filter">
+              <option value="all">All results</option>
+              <option value="fit">Fit</option>
+              <option value="unfit">Unfit</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="new-cert-btn">
+            <span id="plus-icon-slot"></span> Record Certification
+          </button>
+        </div>
+
+        <div id="certs-table-region"></div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Record Certification Modal (Split-Screen View) -->
+  <div class="modal-backdrop" id="cert-modal-backdrop">
+    <div class="modal modal-wide" style="max-width: 980px; width: 95vw;">
+      <div class="modal-header">
+        <div>
+          <h2>Record Certification Exam</h2>
+          <p>Pre-employment medical exam result for a registered candidate.</p>
+        </div>
+        <button class="icon-btn" id="cert-modal-close"></button>
+      </div>
+      <form id="cert-form">
+        <div class="modal-body">
+          <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
+            
+            <!-- Left Column: Doctor's Clinical Findings (Read-only Reference) -->
+            <div id="cf-clinical-reference-panel" style="flex:1; min-width:320px; background:var(--color-bg-secondary); border:1px solid var(--color-border-subtle); border-radius:var(--radius-md); padding:16px;">
+              <h4 style="margin:0 0 12px; font-size:14px; display:flex; align-items:center; gap:6px;">
+                Doctor's Examination Findings
+              </h4>
+              <div id="cf-clinical-content">
+                <p class="text-muted" style="font-size:12.5px;">Select a candidate or complete a clinical visit to view doctor's findings here.</p>
+              </div>
+            </div>
+
+            <!-- Right Column: Certification Exam Fields & Results -->
+            <div style="flex:1.2; min-width:340px;">
+              <div class="form-grid">
+                <div class="field span-2">
+                  <label for="cf-registration">Candidate</label>
+                  <select id="cf-registration" required></select>
+                  <div class="hint" id="cf-registration-hint"></div>
+                </div>
+                <div class="field span-2">
+                  <label for="cf-physician">Examining physician</label>
+                  <select id="cf-physician" required></select>
+                </div>
+                <div class="field">
+                  <label for="cf-physical">Physical examination</label>
+                  <select id="cf-physical"><option value="normal">Normal</option><option value="abnormal">Abnormal</option></select>
+                </div>
+                <div class="field">
+                  <label for="cf-hygiene">Personal hygiene</label>
+                  <select id="cf-hygiene"><option value="good">Good</option><option value="fair">Fair</option><option value="poor">Poor</option></select>
+                </div>
+                <div class="field">
+                  <label for="cf-skin">Skin disease</label>
+                  <select id="cf-skin"><option value="none">None</option><option value="present">Present</option></select>
+                </div>
+                <div class="field">
+                  <label for="cf-stool">Stool exam (direct)</label>
+                  <select id="cf-stool"><option value="negative">Negative</option><option value="positive">Positive</option></select>
+                </div>
+                <div class="field">
+                  <label for="cf-syphilis">Syphilis</label>
+                  <select id="cf-syphilis"><option value="negative">Negative</option><option value="positive">Positive</option></select>
+                </div>
+                <div class="field">
+                  <label for="cf-gonorrhea">Gonorrhea</label>
+                  <select id="cf-gonorrhea"><option value="negative">Negative</option><option value="positive">Positive</option></select>
+                </div>
+                <div class="field span-2">
+                  <label for="cf-other">Other findings</label>
+                  <textarea id="cf-other" rows="2"></textarea>
+                </div>
+                <div class="field span-2">
+                  <label for="cf-result">Result</label>
+                  <select id="cf-result" required>
+                    <option value="">Select…</option>
+                    <option value="fit">Fit</option>
+                    <option value="unfit">Unfit</option>
+                  </select>
+                </div>
+                <div class="field span-2">
+                  <label for="cf-treatment">Treatment note (if unfit)</label>
+                  <textarea id="cf-treatment" rows="2"></textarea>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="cert-form-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="cert-form-submit">Save Exam Result</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Certification Detail Modal -->
+  <div class="modal-backdrop" id="cert-detail-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:14px;">
+          <div id="cd-avatar-slot"></div>
+          <div>
+            <h2 id="cd-name" style="margin:0; font-size:18px;"></h2>
+            <p id="cd-sub" style="margin:2px 0 0; color:var(--color-text-muted); font-size:13px;"></p>
+          </div>
+        </div>
+        <button class="icon-btn" id="cert-detail-close"></button>
+      </div>
+      <div class="modal-body" id="cert-detail-body"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cd-view-candidate">View Candidate</button>
+        <button class="btn btn-primary" id="cd-edit-cert" style="margin-left:auto;">Edit Certification</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Certification Modal -->
+  <div class="modal-backdrop" id="cert-edit-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2 id="ce-title">Edit Certification</h2>
+          <p id="ce-sub" class="text-muted"></p>
+        </div>
+        <button class="icon-btn" id="cert-edit-close"></button>
+      </div>
+      <form id="cert-edit-form" class="modal-body" style="padding:20px;">
+        <input type="hidden" id="ce-cert-id" />
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap:14px;">
+          <div class="field">
+            <label for="ce-exam-date">Examination Date</label>
+            <input type="datetime-local" id="ce-exam-date" />
+          </div>
+          <div class="field">
+            <label for="ce-result">Result</label>
+            <select id="ce-result">
+              <option value="">— keep current —</option>
+              <option value="fit">Fit</option>
+              <option value="unfit">Unfit</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ce-physician">Physician</label>
+            <select id="ce-physician">
+              <option value="">— keep current —</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ce-physical">Physical Examination</label>
+            <select id="ce-physical">
+              <option value="">— keep current —</option>
+              <option value="normal">Normal</option>
+              <option value="abnormal">Abnormal</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ce-hygiene">Personal Hygiene</label>
+            <select id="ce-hygiene">
+              <option value="">— keep current —</option>
+              <option value="good">Good</option>
+              <option value="fair">Fair</option>
+              <option value="poor">Poor</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ce-skin">Skin Disease</label>
+            <select id="ce-skin">
+              <option value="">— keep current —</option>
+              <option value="negative">Negative</option>
+              <option value="positive">Positive</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ce-stool">Stool Exam (Direct)</label>
+            <select id="ce-stool">
+              <option value="">— keep current —</option>
+              <option value="negative">Negative</option>
+              <option value="positive">Positive</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ce-syphilis">Syphilis</label>
+            <select id="ce-syphilis">
+              <option value="">— keep current —</option>
+              <option value="negative">Negative</option>
+              <option value="positive">Positive</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ce-gonorrhea">Gonorrhea</label>
+            <select id="ce-gonorrhea">
+              <option value="">— keep current —</option>
+              <option value="negative">Negative</option>
+              <option value="positive">Positive</option>
+            </select>
+          </div>
+          <div class="field span-2">
+            <label for="ce-other">Other Findings</label>
+            <textarea id="ce-other" rows="2"></textarea>
+          </div>
+          <div class="field span-2">
+            <label for="ce-treatment">Treatment Note</label>
+            <textarea id="ce-treatment" rows="2"></textarea>
+          </div>
+        </div>
+      </form>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="cert-edit-cancel">Cancel</button>
+        <button type="submit" form="cert-edit-form" class="btn btn-primary" id="cert-edit-submit">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  
+  <script src="js/auth.js"></script>
+  <script src="js/permissions.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/certifications.js"></script>
+</body>
+</html>
+
+

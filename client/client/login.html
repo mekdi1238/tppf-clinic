@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in · TPPF Clinic</title>
+  <link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+
+<body class="login-page">
+
+  <div class="login-card">
+    <div class="login-brandblock">
+      <img src="assets/logo-mark.svg" alt="TPPF Clinic logo" />
+      <div class="org-name">TPPF CLINIC</div>
+      <div class="org-tagline">Occupational &amp; Community Health Services</div>
+    </div>
+
+    <div class="login-appblock">
+      <div class="app-icon" id="app-icon-slot"></div>
+      <div>
+        <h1>Clinic Management</h1>
+        <p>Sign in to continue</p>
+      </div>
+    </div>
+
+    <form class="login-form" id="login-form" novalidate>
+      <div class="login-alert" id="login-alert">
+        <span id="login-alert-icon"></span>
+        <span id="login-alert-text"></span>
+      </div>
+
+      <div class="field">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" autocomplete="username" required />
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required />
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" id="login-submit">
+        <span id="login-submit-label">Login</span>
+      </button>
+
+
+    </form>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  
+  <script src="js/auth.js"></script>
+  <script src="js/permissions.js"></script>
+  <script src="js/roles.js"></script>
+  <script>
+    document.getElementById('app-icon-slot').innerHTML = Icons.render('stethoscope');
+    document.getElementById('login-alert-icon').innerHTML = Icons.render('alert');
+
+    function getLandingPage() {
+      const allowed = RoleGuard.allowedNavKeys();
+      let landing = 'dashboard.html';
+      if (allowed) {
+        if (allowed.includes('dept-hr')) {
+          landing = 'dept-hr.html';
+        } else if (allowed.includes('dashboard')) {
+          landing = 'dashboard.html';
+        } else if (allowed.includes('reports')) {
+          landing = 'reports.html';
+        } else if (allowed[0]) {
+          const keyToPage = {
+            'dept-hr': 'dept-hr.html',
+            'patients': 'patients.html',
+            'visits': 'visits.html',
+            'admissions': 'admissions.html',
+            'employee-registrations': 'registrations.html',
+            'certifications': 'certifications.html',
+            'laboratory': 'laboratory.html',
+            'pharmacy': 'pharmacy.html',
+            'referrals': 'referrals.html',
+            'reports': 'reports.html',
+            'users': 'users.html',
+            'backup': 'backup.html',
+            'settings': 'settings.html',
+          };
+          landing = keyToPage[allowed[0]] || `${allowed[0]}.html`;
+        }
+      }
+      return landing;
+    }
+
+    // Clear session immediately on fresh load
+    Auth.clearSession();
+
+    // When the browser restores login.html from bfcache (Back button),
+    // the DOM is stale (e.g. button stuck on "Signing in...").
+    // Force a full reload so the page is completely fresh.
+    window.addEventListener('pageshow', function (event) {
+      Auth.clearSession();
+      if (event.persisted) {
+        window.location.reload();
+        return;
+      }
+    });
+
+    const form = document.getElementById('login-form');
+    const alertBox = document.getElementById('login-alert');
+    const alertText = document.getElementById('login-alert-text');
+    const submitBtn = document.getElementById('login-submit');
+    const submitLabel = document.getElementById('login-submit-label');
+
+    function showError(msg) {
+      alertText.textContent = msg;
+      alertBox.classList.add('visible');
+    }
+    function hideError() {
+      alertBox.classList.remove('visible');
+    }
+    function setLoading(loading) {
+      submitBtn.disabled = loading;
+      submitLabel.innerHTML = loading ? '<span class="spinner"></span> Signing in…' : 'Login';
+    }
+
+    // Check if user was redirected due to session timeout/expiration
+    const urlParams = new URLSearchParams(window.location.search);
+    const reason = urlParams.get('reason');
+    if (reason === 'timeout') {
+      showError('Your session has timed out due to inactivity. Please sign in again.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (reason === 'expired') {
+      showError('Your session has expired. Please sign in again.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideError();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!username || !password) {
+        showError('Please enter both your username and password.');
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const result = await Api.login(username, password);
+        Auth.setSession(result);
+
+        window.location.href = getLandingPage();
+      } catch (err) {
+        showError(err.message || 'Could not sign in. Please try again.');
+        setLoading(false);
+      }
+    });
+  </script>
+</body>
+
+</html>
+

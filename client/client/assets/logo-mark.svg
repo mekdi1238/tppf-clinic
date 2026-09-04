@@ -1,0 +1,15 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="markGrad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#12817A"/>
+      <stop offset="1" stop-color="#0A4F49"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#markGrad)"/>
+  <!-- pulse line that resolves into a cross -->
+  <path d="M8 34 H20 L24 22 L30 44 L35 30 L38 34 H48"
+        fill="none" stroke="#EAF6F4" stroke-width="3.4"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M48 27 V41 M41 34 H55" stroke="#EAF6F4" stroke-width="3.4"
+        stroke-linecap="round"/>
+</svg>

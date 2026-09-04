@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<title>Employee Registrations · TPPF Clinic</title>
+<link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" id="page-content">
+
+        <div class="notice notice-info">
+          <span id="header-info-icon"></span>
+          <span>Employee Registrations (R-series) are permanent pre-employment records. They're never deleted — even after a candidate is hired, this history stays intact.</span>
+        </div>
+
+        <div class="page-toolbar">
+          <div class="toolbar-filters">
+            <div class="search-box">
+              <span id="search-icon-slot"></span>
+              <input type="text" id="search-input" placeholder="Search by name, code, or occupation…" />
+            </div>
+            <select class="select-filter" id="status-filter">
+              <option value="all">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="certified_fit">Certified Fit</option>
+              <option value="certified_unfit">Certified Unfit</option>
+              <option value="hired">Hired (Patient)</option>
+              <option value="accepted_as_staff">Accepted as Staff</option>
+              <option value="withdrawn">Withdrawn</option>
+            </select>
+            <select class="select-filter" id="department-filter">
+              <option value="all">All departments</option>
+              <option value="Manager">Manager</option>
+              <option value="Human Resource Management">Human Resource Management</option>
+              <option value="Planning and Budget Service">Planning and Budget Service</option>
+              <option value="Production Quality Control Service">Production Quality Control Service</option>
+              <option value="Production">Production</option>
+              <option value="Technic">Technic</option>
+              <option value="Property Management">Property Management</option>
+              <option value="Finance">Finance</option>
+            </select>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="btn btn-secondary" id="export-reg-btn">
+              <span id="download-icon-slot"></span> Export
+            </button>
+            <button type="button" class="btn btn-secondary" id="import-reg-btn">
+              <span id="upload-icon-slot"></span> Import
+            </button>
+            <button class="btn btn-primary" id="new-registration-btn">
+              <span id="plus-icon-slot"></span> New Registration
+            </button>
+          </div>
+        </div>
+
+        <div id="registrations-table-region"></div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- New Registration Modal -->
+  <div class="modal-backdrop" id="reg-modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2>New Registration</h2>
+          <p>Register a pre-employment candidate.</p>
+        </div>
+        <button class="icon-btn" id="reg-modal-close"></button>
+      </div>
+      <form id="reg-form">
+        <div class="modal-body">
+          <div id="rf-photo-container"></div>
+          <div class="form-grid">
+            <div class="field span-2">
+              <label for="rf-full-name">Full name</label>
+              <input type="text" id="rf-full-name" required />
+            </div>
+            <div class="field">
+              <label for="rf-dob">Date of birth</label>
+              <input type="date" id="rf-dob" />
+            </div>
+            <div class="field">
+              <label for="rf-gender">Gender</label>
+              <select id="rf-gender">
+                <option value="">Select…</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="rf-location">Location</label>
+              <input type="text" id="rf-location" placeholder="City / area" />
+            </div>
+            <div class="field">
+              <label for="rf-occupation">Occupation applied for</label>
+              <input type="text" id="rf-occupation" required />
+            </div>
+            <div class="field span-2">
+              <label for="rf-department">Department</label>
+              <select id="rf-department" required>
+                <option value="">Select department…</option>
+                <option value="Manager">Manager</option>
+                <option value="Human Resource Management">Human Resource Management</option>
+                <option value="Planning and Budget Service">Planning and Budget Service</option>
+                <option value="Production Quality Control Service">Production Quality Control Service</option>
+                <option value="Production">Production</option>
+                <option value="Technic">Technic</option>
+                <option value="Property Management">Property Management</option>
+                <option value="Finance">Finance</option>
+              </select>
+            </div>
+
+            <div class="field span-2">
+              <label for="rf-position">Position</label>
+              <select id="rf-position" required>
+                <option value="">Select department first…</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <span class="footer-note" id="reg-form-note">A registration code (R0xx) will be assigned automatically.</span>
+          <button type="button" class="btn btn-secondary" id="reg-form-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="reg-form-submit">Save Registration</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Registration Detail Modal -->
+  <div class="modal-backdrop" id="reg-detail-backdrop">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <div>
+          <h2 id="rd-name"></h2>
+          <p id="rd-code"></p>
+        </div>
+        <button class="icon-btn" id="reg-detail-close"></button>
+      </div>
+      <div class="modal-body" id="reg-detail-body"></div>
+      <div class="modal-footer" id="reg-detail-footer"></div>
+    </div>
+  </div>
+
+  <!-- Record Certification Modal -->
+  <div class="modal-backdrop" id="cert-modal-backdrop">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <div>
+          <h2>Record Certification Exam</h2>
+          <p id="cert-modal-sub">Pre-employment medical exam result.</p>
+        </div>
+        <button class="icon-btn" id="cert-modal-close"></button>
+      </div>
+      <form id="cert-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <input type="hidden" id="cf-registration-id" />
+            <div class="field span-2">
+              <label for="cf-physician">Examining physician</label>
+              <select id="cf-physician" required></select>
+            </div>
+            <div class="field">
+              <label for="cf-physical">Physical examination</label>
+              <select id="cf-physical"><option value="normal">Normal</option><option value="abnormal">Abnormal</option></select>
+            </div>
+            <div class="field">
+              <label for="cf-hygiene">Personal hygiene</label>
+              <select id="cf-hygiene"><option value="good">Good</option><option value="fair">Fair</option><option value="poor">Poor</option></select>
+            </div>
+            <div class="field">
+              <label for="cf-skin">Skin disease</label>
+              <select id="cf-skin"><option value="none">None</option><option value="present">Present</option></select>
+            </div>
+            <div class="field">
+              <label for="cf-stool">Stool exam (direct)</label>
+              <select id="cf-stool"><option value="negative">Negative</option><option value="positive">Positive</option></select>
+            </div>
+            <div class="field">
+              <label for="cf-syphilis">Syphilis</label>
+              <select id="cf-syphilis"><option value="negative">Negative</option><option value="positive">Positive</option></select>
+            </div>
+            <div class="field">
+              <label for="cf-gonorrhea">Gonorrhea</label>
+              <select id="cf-gonorrhea"><option value="negative">Negative</option><option value="positive">Positive</option></select>
+            </div>
+            <div class="field span-2">
+              <label for="cf-other">Other findings</label>
+              <textarea id="cf-other" rows="2"></textarea>
+            </div>
+            <div class="field span-2">
+              <label for="cf-result">Result</label>
+              <select id="cf-result" required>
+                <option value="">Select…</option>
+                <option value="fit">Fit</option>
+                <option value="unfit">Unfit</option>
+              </select>
+            </div>
+            <div class="field span-2">
+              <label for="cf-treatment">Treatment note (if unfit)</label>
+              <textarea id="cf-treatment" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="cert-form-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="cert-form-submit">Save Exam Result</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Accept as Staff Modal -->
+  <div class="modal-backdrop" id="staff-modal-backdrop">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <div>
+          <h2>Accept as Clinic Staff</h2>
+          <p id="staff-modal-sub">Assign a department and position to this candidate.</p>
+        </div>
+        <button class="icon-btn" id="staff-modal-close"></button>
+      </div>
+      <form id="staff-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <input type="hidden" id="sf-registration-id" />
+
+            <div class="field">
+              <label for="sf-date-recruited">Date recruited</label>
+              <input type="date" id="sf-date-recruited" />
+            </div>
+
+            <!-- Medical-only fields -->
+            <div class="field" id="sf-license-field" style="display:none;">
+              <label for="sf-license-no">License No.</label>
+              <input type="text" id="sf-license-no" placeholder="e.g. ML-2201" />
+            </div>
+            <div class="field span-2" id="sf-qualification-field" style="display:none;">
+              <label for="sf-qualification">Qualification</label>
+              <input type="text" id="sf-qualification" placeholder="e.g. General Practitioner, MD" />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <span class="footer-note" id="staff-form-note">A staff code will be assigned automatically based on the department.</span>
+          <button type="button" class="btn btn-secondary" id="staff-form-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="staff-form-submit">Accept as Staff</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  
+  <script src="js/auth.js"></script>
+  <script src="js/permissions.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/camera.js"></script>
+  <script src="js/exportModal.js"></script>
+  <script src="js/importModal.js"></script>
+  <script src="js/registrations.js"></script>
+</body>
+</html>
+
+

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<title>Visits · TPPF Clinic</title>
+<link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" id="page-content">
+
+        <div class="page-toolbar">
+          <div class="toolbar-filters">
+            <div class="search-box">
+              <span id="search-icon-slot"></span>
+              <input type="text" id="search-input" placeholder="Search by patient, code, or complaint…" />
+            </div>
+            <select class="select-filter" id="status-filter">
+              <option value="">All statuses</option>
+              <option value="open">Open</option>
+              <option value="examined">Examined</option>
+              <option value="diagnosed">Diagnosed</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="new-visit-btn">
+            <span id="plus-icon-slot"></span> New Visit
+          </button>
+        </div>
+
+        <div id="visits-table-region"></div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- New Visit Modal -->
+  <div class="modal-backdrop" id="visit-modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2>New Visit</h2>
+          <p>Open a new clinical encounter for a patient.</p>
+        </div>
+        <button class="icon-btn" id="visit-modal-close"></button>
+      </div>
+      <form id="visit-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="field span-2">
+              <label for="vf-patient">Patient</label>
+              <select id="vf-patient" required></select>
+            </div>
+            <div class="field span-2">
+              <label for="vf-physician">Physician</label>
+              <select id="vf-physician" required></select>
+            </div>
+            <div class="field span-2">
+              <label for="vf-complaint">Chief complaint</label>
+              <textarea id="vf-complaint" rows="3" placeholder="Why is the patient here today?" required></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="visit-form-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="visit-form-submit">Open Visit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Visit Detail / Update Modal -->
+  <div class="modal-backdrop" id="visit-detail-backdrop">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <div>
+          <h2 id="vd-title"></h2>
+          <p id="vd-sub"></p>
+        </div>
+        <button class="icon-btn" id="visit-detail-close"></button>
+      </div>
+      <div class="modal-body" id="visit-detail-body"></div>
+      <div class="modal-footer" id="visit-detail-footer"></div>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  
+  <script src="js/auth.js"></script>
+  <script src="js/permissions.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/printDocument.js"></script>
+  <script src="js/visits.js"></script>
+</body>
+</html>
+
+

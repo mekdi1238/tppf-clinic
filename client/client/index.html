@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>TPPF Clinic</title>
+
+  <script src="js/auth.js"></script>
+  <script src="js/permissions.js"></script>
+<script src="js/roles.js"></script>
+<script>
+  if (Auth.isLoggedIn()) {
+    const allowed = RoleGuard.allowedNavKeys();
+    if (allowed && allowed.includes('dept-hr')) {
+      window.location.replace('dept-hr.html');
+    } else if (allowed && allowed.length && !allowed.includes('dashboard')) {
+      const keyToPage = { 'dept-hr': 'dept-hr.html', 'reports': 'reports.html' };
+      window.location.replace(keyToPage[allowed[0]] || `${allowed[0]}.html`);
+    } else {
+      window.location.replace('dashboard.html');
+    }
+  } else {
+    window.location.replace('login.html');
+  }
+</script>
+</head>
+<body></body>
+</html>
+
+

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<title>Archive · TPPF Clinic</title>
+<meta name="description" content="View and restore archived patients and employee registrations." />
+<link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" id="page-content">
+
+        <div class="page-toolbar">
+          <div class="toolbar-filters">
+            <div class="search-box">
+              <span id="search-icon-slot"></span>
+              <input type="text" id="search-input" placeholder="Search archived records…" />
+            </div>
+            <select class="select-filter" id="type-filter">
+              <option value="all">All types</option>
+              <option value="patients">Patients</option>
+              <option value="registrations">Registrations</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Info banner -->
+        <div class="notice notice-info" style="margin-bottom: 18px;">
+          <span>Archived records are hidden from the main lists but remain safely in the database. You can <strong>restore</strong> them at any time.</span>
+        </div>
+
+        <div id="archive-table-region"></div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  
+  <script src="js/auth.js"></script>
+  <script src="js/permissions.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/archive.js"></script>
+</body>
+</html>
+
+
