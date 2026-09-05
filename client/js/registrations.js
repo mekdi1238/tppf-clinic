@@ -28,73 +28,65 @@ if (exportRegBtn) {
   exportRegBtn.addEventListener('click', () => ExportModal.open('registrations'));
 }
 
+const canCreateReg = typeof Permissions !== 'undefined' ? Permissions.has('registrations.create') : true;
+
 const importRegBtn = document.getElementById('import-reg-btn');
 if (importRegBtn) {
-  importRegBtn.addEventListener('click', () => ImportModal.open('registrations', () => loadRegistrations()));
+  if (!canCreateReg) {
+    importRegBtn.style.display = 'none';
+  } else {
+    importRegBtn.addEventListener('click', () => ImportModal.open('registrations', () => loadRegistrations()));
+  }
+}
+
+const newRegBtn = document.getElementById('new-reg-btn');
+if (newRegBtn && !canCreateReg) {
+  newRegBtn.style.display = 'none';
 }
 
 let currentList = [];
 let physiciansCache = [];
 let editingRegId = null;
 
-// Role check: only hr_admin and physician can accept candidates as staff
-const canAcceptAsStaff = RoleGuard.has('hr_admin') || RoleGuard.has('physician') || RoleGuard.has('system_administrator');
+// Role & permission check: check granular permission registrations.accept if defined
+const canAcceptAsStaff = typeof Permissions !== 'undefined'
+  ? Permissions.has('registrations.accept')
+  : (RoleGuard.has('hr_admin') || RoleGuard.has('physician') || RoleGuard.has('system_administrator') || RoleGuard.has('department_hr'));
 
-// ---------- Department → Position map ----------
-// Positions are placeholders; update with your final list when ready.
-const DEPARTMENT_POSITIONS = {
-  'Medical': [
-    'Physician (General)',
-    'Specialist Physician',
-    'Lab Technician',
-    'Pharmacist',
-    'Nurse',
-    'Radiologist',
-    'Medical Officer',
-  ],
-  'Finance': [
-    'Finance Officer',
-    'Accountant',
-    'Senior Accountant',
-    'Finance Manager',
-    'Budget Officer',
-  ],
-  'Human Resource Management': [
-    'HR Manager',
-    'HR Officer',
-    'HR Administrator',
-    // Safety and Security sub-unit
-    'Safety Officer',
-    'Security Officer',
-    'Security Guard',
-    'Safety and Security Supervisor',
-  ],
-  'Planning and Budget Service': [
-    'Planning Officer',
-    'Budget Analyst',
-    'Planning Manager',
-    'Budget Planning Coordinator',
-  ],
-  'Product Quality Control Service': [
-    'Quality Control Inspector',
-    'QC Supervisor',
-    'Quality Assurance Officer',
-    'QC Manager',
-  ],
-  'Production and Technic': [
-    'Technician',
-    'Machine Operator',
-    'Production Supervisor',
-    'Senior Technician',
-    'Maintenance Engineer',
-  ],
-  'Property Management': [
-    'Property Officer',
-    'Facility Manager',
-    'Property Supervisor',
-    'Maintenance Officer',
-  ],
-};
+let DEPARTMENT_POSITIONS = {};
+let dynamicDepartments = [];
+
+async function loadDepartmentOptions() {
+  try {
+    dynamicDepartments = await Api.departments.list();
+    DEPARTMENT_POSITIONS = {};
+    for (const d of dynamicDepartments) {
+      DEPARTMENT_POSITIONS[d.name] = (d.positions || []).map(p => p.name);
+    }
+
+    // Populate department-filter
+    const deptFilter = document.getElementById('department-filter');
+    if (deptFilter) {
+      const currentVal = deptFilter.value;
+      deptFilter.innerHTML = `<option value="all">All departments</option>` +
+        dynamicDepartments.map(d => `<option value="${UI.escapeHtml(d.name)}">${UI.escapeHtml(d.name)}</option>`).join('');
+      if (currentVal && (currentVal === 'all' || dynamicDepartments.some(d => d.name === currentVal))) {
+        deptFilter.value = currentVal;
+      }
+    }
+
+    // Populate rf-department in registration form
+    const rfDept = document.getElementById('rf-department');
+    if (rfDept) {
+      const currentVal = rfDept.value;
+      rfDept.innerHTML = `<option value="">Select department…</option>` +
+        dynamicDepartments.map(d => `<option value="${UI.escapeHtml(d.name)}">${UI.escapeHtml(d.name)}</option>`).join('');
+      if (currentVal) rfDept.value = currentVal;
+    }
+  } catch (err) {
+    console.error('Failed to load department options in registrations', err);
+  }
+}
 
 function debounce(fn, ms) {
   let t;
@@ -329,6 +321,7 @@ function renderRegDetail(r) {
     ${canEdit ? `<button class="btn btn-secondary" id="rd-edit-btn">Edit</button>` : ''}
     ${canWithdraw ? `<button class="btn btn-secondary" id="rd-withdraw-btn">${isArchived ? 'Restore' : 'Archive'}</button>` : ''}
     ${isAdmin ? `<button class="btn btn-danger" id="rd-delete-btn" style="background-color: #dc3545; color: white;">Delete (Hard)</button>` : ''}
+    ${canCertify ? `<button class="btn btn-primary" id="rd-create-visit-btn">${Icons.render('plus')} Create Visit for Certification</button>` : ''}
     ${canCertify ? `<button class="btn btn-secondary" id="rd-certify-btn">Record Certification</button>` : ''}
     ${canConvertToStaff ? `<button class="btn btn-secondary" id="rd-staff-btn">${Icons.render('employees')} Accept as Staff</button>` : ''}
     ${!canCertify && !canWithdraw && !canEdit && !canConvertToStaff && !isAdmin ? `<span class="footer-note">This record is closed to further changes.</span>` : ''}
@@ -337,7 +330,24 @@ function renderRegDetail(r) {
   if (canEdit) document.getElementById('rd-edit-btn').addEventListener('click', () => { closeRegDetail(); openRegForm(r.id); });
   if (canWithdraw) document.getElementById('rd-withdraw-btn').addEventListener('click', (e) => withdrawRegistration(r.id, e.currentTarget));
   if (isAdmin) document.getElementById('rd-delete-btn').addEventListener('click', (e) => deleteRegistration(r.id, e.currentTarget));
-  if (canCertify) document.getElementById('rd-certify-btn').addEventListener('click', () => openCertForm(r));
+  if (canCertify) {
+    document.getElementById('rd-create-visit-btn').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Creating…';
+      try {
+        const res = await Api.registrations.createVisit(r.id);
+        UI.toast(`Visit created for ${r.full_name} (${res.patient.patient_code}). Candidate added to clinical queue.`);
+        closeRegDetail();
+        window.location.href = `visits.html?open=${res.visit.id}`;
+      } catch (err) {
+        UI.toast(UI.errorMessage(err), 'danger');
+        btn.disabled = false;
+        btn.innerHTML = `${Icons.render('plus')} Create Visit for Certification`;
+      }
+    });
+    document.getElementById('rd-certify-btn').addEventListener('click', () => openCertForm(r));
+  }
   if (canConvertToStaff) document.getElementById('rd-staff-btn').addEventListener('click', () => openAcceptAsStaffForm(r));
 }
 
@@ -530,6 +540,7 @@ document.getElementById('status-filter').addEventListener('change', loadRegistra
 document.getElementById('department-filter').addEventListener('change', loadRegistrations);
 
 async function init() {
+  await loadDepartmentOptions();
   await loadPhysicians();
   await loadRegistrations();
   const params = new URLSearchParams(window.location.search);

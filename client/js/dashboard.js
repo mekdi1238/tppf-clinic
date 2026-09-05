@@ -297,9 +297,39 @@ async function renderPhysicianDashboard() {
   `;
 }
 
+async function renderCheckupAlertBanner() {
+  try {
+    const dueList = await Api.checkups.due();
+    if (!dueList || !dueList.length) return;
+
+    const bannerHtml = `
+      <div class="notice notice-warning" style="margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; border-left:4px solid #D98B3F;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span style="display:inline-flex; width:22px; height:22px; color:#D98B3F;">${Icons.render('alert')}</span>
+          <div>
+            <strong style="font-size:14px;">1-Week Medical Check-up Renewal Alert:</strong>
+            <span style="font-size:13px;">${dueList.length} active employee(s) have 6-month medical fit cards expiring within 7 days or overdue.</span>
+          </div>
+        </div>
+        <a href="checkups.html" class="btn btn-primary btn-sm" style="font-weight:700;">
+          View Due Check-ups &amp; Dispatch (${dueList.length})
+        </a>
+      </div>`;
+
+    const mainRoot = document.getElementById('main-root');
+    if (mainRoot) {
+      const firstChild = mainRoot.firstElementChild;
+      if (firstChild) firstChild.insertAdjacentHTML('beforebegin', bannerHtml);
+    }
+  } catch (e) {
+    console.error('Failed to load checkup due alert:', e);
+  }
+}
+
 async function init() {
   const role = RoleGuard.restrictedRole();
   try {
+    await renderCheckupAlertBanner();
     if (role === 'lab_technician') { await renderLabTechDashboard(); return; }
     if (role === 'pharmacist') { await renderPharmacistDashboard(); return; }
     if (role === 'receptionist') { await renderReceptionistDashboard(); return; }

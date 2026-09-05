@@ -1,10 +1,8 @@
 /* ===========================================================
    Role guard — role-aware nav and access scoping
    -----------------------------------------------------------
-   This is a UI scoping layer only (hides nav/actions a role
-   shouldn't use day-to-day). It is NOT a security boundary —
-   the mock layer doesn't enforce any of this server-side, and
-   neither does the real backend yet. See BACKEND_HANDOFF.md.
+   Now delegates to Permissions.js for granular per-user
+   permission checks, while maintaining backward compatibility.
    =========================================================== */
 
 const RoleGuard = (() => {
@@ -19,23 +17,7 @@ const RoleGuard = (() => {
     'System Administrator': 'system_administrator',
   };
 
-  // Roles that give a user the full, unrestricted view regardless of
-  // what else they hold. Only the system administrator gets this —
-  // every other role below is scoped to its own nav set.
   const ELEVATED = ['system_administrator'];
-
-  // Which nav item keys (see shell.js NAV_SECTIONS) each restricted
-  // role is allowed to see. Anyone not listed here (or holding an
-  // elevated role) sees the full nav, unfiltered.
-  const NAV_VISIBILITY = {
-    department_hr: ['dept-hr', 'reports', 'profile'],
-    hr_reporting: ['reports', 'profile'],
-    hr_admin: ['dashboard', 'patients', 'visits', 'admissions', 'employee-registrations', 'certifications', 'laboratory', 'pharmacy', 'referrals', 'reports', 'archive', 'users', 'profile'],
-    lab_technician: ['dashboard', 'patients', 'laboratory', 'profile'],
-    pharmacist: ['dashboard', 'patients', 'pharmacy', 'profile'],
-    receptionist: ['dashboard', 'patients', 'visits', 'employee-registrations', 'profile'],
-    physician: ['dashboard', 'patients', 'visits', 'admissions', 'laboratory', 'pharmacy', 'referrals', 'employee-registrations', 'certifications', 'profile'],
-  };
 
   function current() {
     const session = Auth.getSession();
@@ -50,42 +32,27 @@ const RoleGuard = (() => {
   function isRestricted() {
     const roles = current();
     if (!roles.length) return false;
-    return roles.every(r => !ELEVATED.includes(r)) && roles.some(r => NAV_VISIBILITY[r]);
+    return roles.every(r => !ELEVATED.includes(r));
   }
 
   function restrictedRole() {
     const roles = current();
     if (!roles.length) return null;
     if (roles.some(r => ELEVATED.includes(r))) return null;
-    return roles.find(r => NAV_VISIBILITY[r]) || null;
+    return roles[0] || null;
   }
 
+  // Delegate to Permissions engine for nav keys
   function allowedNavKeys() {
-    const roles = current();
-    if (!roles.length) return null;
-    if (roles.some(r => ELEVATED.includes(r))) return null;
-
-    let hasUnrestricted = false;
-    const allowedSet = new Set();
-
-    for (const r of roles) {
-      if (NAV_VISIBILITY[r]) {
-        NAV_VISIBILITY[r].forEach(k => allowedSet.add(k));
-      } else {
-        hasUnrestricted = true;
-      }
+    if (typeof Permissions !== 'undefined') {
+      return Permissions.allowedNavKeys();
     }
-
-    if (hasUnrestricted) return null;
-    return Array.from(allowedSet);
+    return null; // fallback: no filtering
   }
 
   function blockIfNotAllowed(pageKey) {
-    const allowed = allowedNavKeys();
-    if (allowed && !allowed.includes(pageKey)) {
-      const target = allowed.includes('dept-hr') ? 'dept-hr.html' : (allowed.includes('dashboard') ? 'dashboard.html' : `${allowed[0]}.html`);
-      window.location.replace(target);
-      return true;
+    if (typeof Permissions !== 'undefined') {
+      return Permissions.blockIfNotAllowed(pageKey);
     }
     return false;
   }

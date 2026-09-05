@@ -44,21 +44,33 @@ function readMigrationFiles() {
     .sort(); // filenames are zero-padded (0001_, 0002_, ...) so plain string sort = correct order
 }
 
-function splitUpDown(fileContents) {
+function splitUpDown(fileContents, filename = "") {
   const upMarker = "-- +migrate Up";
   const downMarker = "-- +migrate Down";
   const upIndex = fileContents.indexOf(upMarker);
   const downIndex = fileContents.indexOf(downMarker);
-  if (upIndex === -1 || downIndex === -1) {
-    throw new Error(
-      `Migration file is missing "${upMarker}" or "${downMarker}" markers.`
-    );
+
+  if (upIndex !== -1 && downIndex !== -1) {
+    return {
+      up: fileContents.slice(upIndex + upMarker.length, downIndex).trim(),
+      down: fileContents.slice(downIndex + downMarker.length).trim(),
+    };
   }
+
+  if (upIndex !== -1 && downIndex === -1) {
+    return {
+      up: fileContents.slice(upIndex + upMarker.length).trim(),
+      down: "-- no down migration provided",
+    };
+  }
+
+  // Gracefully fallback: treat the entire file as Up migration
   return {
-    up: fileContents.slice(upIndex + upMarker.length, downIndex).trim(),
-    down: fileContents.slice(downIndex + downMarker.length).trim(),
+    up: fileContents.trim(),
+    down: "-- no down migration provided",
   };
 }
+
 
 async function ensureMigrationsTable(client) {
   // This table is how the runner knows what's already been applied. It is
@@ -103,7 +115,7 @@ async function cmdUp(client) {
 
   for (const file of pending) {
     const fullPath = path.join(MIGRATIONS_DIR, file);
-    const { up } = splitUpDown(fs.readFileSync(fullPath, "utf8"));
+    const { up } = splitUpDown(fs.readFileSync(fullPath, "utf8"), file);
 
     console.log(`Applying ${file} ...`);
     // Every migration runs inside a transaction: if anything in the file
@@ -138,7 +150,8 @@ async function cmdDown(client) {
   // a CLI command is a good way to lose data by accident.
   const mostRecent = [...applied].sort().at(-1);
   const fullPath = path.join(MIGRATIONS_DIR, mostRecent);
-  const { down } = splitUpDown(fs.readFileSync(fullPath, "utf8"));
+  const { down } = splitUpDown(fs.readFileSync(fullPath, "utf8"), mostRecent);
+
 
   console.log(`Reverting ${mostRecent} ...`);
   try {
@@ -156,36 +169,54 @@ async function cmdDown(client) {
   }
 }
 
-async function ensureDatabaseExists() {
+async function ensureDatabaseExists(maxRetries = 15, delayMs = 2000) {
   const dbUrl = process.env.DATABASE_URL;
-  const client = makeClient();
-  try {
-    await client.connect();
-    return client;
-  } catch (err) {
-    if (err.code === "3D000") {
-      // Database does not exist — connect to default 'postgres' DB and create it automatically
-      try {
-        const urlObj = new URL(dbUrl);
-        const dbName = urlObj.pathname.slice(1);
-        urlObj.pathname = "/postgres";
-        console.log(`Database "${dbName}" does not exist. Auto-creating database "${dbName}"...`);
-        const rootClient = new Client({ connectionString: urlObj.toString() });
-        await rootClient.connect();
-        await rootClient.query(`CREATE DATABASE "${dbName}";`);
-        await rootClient.end();
-        console.log(`  ✓ Database "${dbName}" created successfully.`);
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const client = makeClient();
+    try {
+      await client.connect();
+      return client;
+    } catch (err) {
+      if (err.code === "3D000") {
+        // Database does not exist — connect to default 'postgres' DB and create it automatically
+        try {
+          const urlObj = new URL(dbUrl);
+          const dbName = urlObj.pathname.slice(1);
+          urlObj.pathname = "/postgres";
+          console.log(`Database "${dbName}" does not exist. Auto-creating database "${dbName}"...`);
+          const rootClient = new Client({ connectionString: urlObj.toString() });
+          await rootClient.connect();
+          await rootClient.query(`CREATE DATABASE "${dbName}";`);
+          await rootClient.end();
+          console.log(`  ✓ Database "${dbName}" created successfully.`);
 
-        // Now reconnect to the newly created target database
-        const newClient = makeClient();
-        await newClient.connect();
-        return newClient;
-      } catch (createErr) {
-        console.error(`Failed to auto-create database: ${createErr.message}`);
-        throw err;
+          // Now reconnect to the newly created target database
+          const newClient = makeClient();
+          await newClient.connect();
+          return newClient;
+        } catch (createErr) {
+          console.error(`Failed to auto-create database: ${createErr.message}`);
+          throw err;
+        }
       }
+
+      // If Postgres is starting up during boot or connection refused
+      if (
+        err.code === "57P03" ||
+        err.code === "ECONNREFUSED" ||
+        (err.message && err.message.includes("starting up"))
+      ) {
+        if (attempt < maxRetries) {
+          console.log(
+            `[POSTGRES BOOTING] Database is starting up (attempt ${attempt}/${maxRetries}). Retrying in ${delayMs / 1000}s...`
+          );
+          await new Promise((r) => setTimeout(r, delayMs));
+          continue;
+        }
+      }
+
+      throw err;
     }
-    throw err;
   }
 }
 

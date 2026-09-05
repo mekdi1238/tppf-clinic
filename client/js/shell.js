@@ -27,6 +27,7 @@ const NAV_SECTIONS = [
     label: 'Pre-Employment',
     items: [
       { key: 'dept-hr', label: 'Dept HR Portal', icon: 'building', href: 'dept-hr.html', active: true },
+      { key: 'checkups', label: 'Periodic Check-ups', icon: 'filecheck', href: 'checkups.html', active: true },
       { key: 'employee-registrations', label: 'Employee Registrations', icon: 'employees', href: 'registrations.html', active: true },
       { key: 'certifications', label: 'Certifications', icon: 'filecheck', href: 'certifications.html', active: true },
     ],
@@ -43,6 +44,8 @@ const NAV_SECTIONS = [
     label: 'Administration',
     items: [
       { key: 'reports', label: 'Reports', icon: 'reports', href: 'reports.html', active: true },
+      { key: 'departments', label: 'Departments & Positions', icon: 'building', href: 'departments.html', active: true },
+      { key: 'audit-logs', label: 'Activity Logs', icon: 'clock', href: 'audit-logs.html', active: true },
       { key: 'archive', label: 'Archive', icon: 'archive', href: 'archive.html', active: true },
       { key: 'users', label: 'Users & Roles', icon: 'users', href: 'users.html', active: true },
       { key: 'backup', label: 'Backup', icon: 'backup', href: 'backup.html', active: true },
@@ -57,7 +60,8 @@ function renderNavItem(item, activeKey) {
   if (isActive) classes.push('active');
   if (!item.active) classes.push('disabled');
   const badge = !item.active ? '<span class="nav-badge">Soon</span>' : '';
-  return `<a class="${classes.join(' ')}" href="${item.href}">${Icons.render(item.icon)}<span>${item.label}</span>${badge}</a>`;
+  const titleAttr = typeof UI !== 'undefined' ? UI.escapeHtml(item.label) : item.label;
+  return `<a class="${classes.join(' ')}" href="${item.href}" title="${titleAttr}">${Icons.render(item.icon)}<span>${item.label}</span>${badge}</a>`;
 }
 
 function renderShell(activeKey) {
@@ -70,8 +74,12 @@ function renderShell(activeKey) {
     }))
     .filter(section => section.items.length > 0);
 
+  // Check stored sidebar mode: 'collapsed' (default) vs 'expanded'
+  const storedMode = localStorage.getItem('tppf_sidebar_mode');
+  const isCollapsed = storedMode === null ? true : storedMode === 'collapsed';
+
   const sidebarHtml = `
-    <aside class="sidebar" id="sidebar">
+    <aside class="sidebar ${isCollapsed ? 'collapsed' : ''}" id="sidebar">
       <div class="sidebar-brand">
         <img src="assets/logo-mark.svg" alt="TPPF Clinic logo" />
         <div>
@@ -98,6 +106,7 @@ function renderShell(activeKey) {
   const topbarHtml = `
     <header class="topbar">
       <div style="display:flex; align-items:center; gap:12px;">
+        <button class="icon-btn" id="sidebar-collapse-toggle" title="${isCollapsed ? 'Pin sidebar open' : 'Auto-collapse sidebar'}">${Icons.render('menu')}</button>
         <button class="icon-btn" id="mobile-nav-toggle" style="display:none;">${Icons.render('menu')}</button>
         <div>
           <div class="crumb">TPPF Clinic</div>
@@ -106,9 +115,11 @@ function renderShell(activeKey) {
       </div>
       <div class="topbar-right">
         <div class="topbar-user">
-          <div class="avatar">${session ? Auth.initials(session.user.full_name) : '?'}</div>
+          ${(typeof UI !== 'undefined' && UI.avatar)
+            ? UI.avatar(session ? (session.user.full_name || session.user.username) : '', session && session.user ? session.user.photo_url : null, 'width:32px; height:32px; font-size:12px;')
+            : `<div class="avatar">${session ? Auth.initials(session.user.full_name || session.user.username) : '?'}</div>`}
           <div class="topbar-user-info">
-            <div class="name">${session ? session.user.full_name : ''}</div>
+            <div class="name">${session ? (session.user.full_name || session.user.username) : ''}</div>
             <div class="role">${session ? (session.user.roles.join(', ')) : ''}</div>
           </div>
         </div>
@@ -125,6 +136,7 @@ function renderShell(activeKey) {
   document.getElementById('logout-btn').addEventListener('click', () => Auth.logout());
 
   const toggle = document.getElementById('mobile-nav-toggle');
+  const desktopToggle = document.getElementById('sidebar-collapse-toggle');
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('sidebar-overlay');
 
@@ -139,6 +151,7 @@ function renderShell(activeKey) {
   function syncToggleVisibility() {
     const isMobile = window.innerWidth <= 860;
     toggle.style.display = isMobile ? 'inline-flex' : 'none';
+    if (desktopToggle) desktopToggle.style.display = isMobile ? 'none' : 'inline-flex';
     if (!isMobile) closeMobileNav();
   }
 
@@ -146,9 +159,40 @@ function renderShell(activeKey) {
     sidebar.classList.contains('open') ? closeMobileNav() : openMobileNav();
   });
   overlay.addEventListener('click', closeMobileNav);
-  sidebar.addEventListener('click', (e) => {
-    if (e.target.closest('.nav-item')) closeMobileNav();
+
+  // Desktop sidebar auto-collapse & toggle handler
+  if (desktopToggle) {
+    desktopToggle.addEventListener('click', () => {
+      const currentlyCollapsed = sidebar.classList.contains('collapsed');
+      if (currentlyCollapsed) {
+        sidebar.classList.remove('collapsed');
+        localStorage.setItem('tppf_sidebar_mode', 'expanded');
+        desktopToggle.title = 'Auto-collapse sidebar';
+      } else {
+        sidebar.classList.add('collapsed');
+        localStorage.setItem('tppf_sidebar_mode', 'collapsed');
+        desktopToggle.title = 'Pin sidebar open';
+      }
+    });
+  }
+
+  sidebar.addEventListener('mouseleave', () => {
+    const mode = localStorage.getItem('tppf_sidebar_mode');
+    if (mode === null || mode === 'collapsed') {
+      sidebar.classList.add('collapsed');
+    }
   });
+
+  sidebar.addEventListener('click', (e) => {
+    if (e.target.closest('.nav-item')) {
+      const mode = localStorage.getItem('tppf_sidebar_mode');
+      if (mode === null || mode === 'collapsed') {
+        sidebar.classList.add('collapsed');
+      }
+      closeMobileNav();
+    }
+  });
+
   window.addEventListener('resize', syncToggleVisibility);
   syncToggleVisibility();
 }

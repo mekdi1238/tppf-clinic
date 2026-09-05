@@ -204,6 +204,37 @@ function openDrilldownModal(title, subtitle, list, type) {
           </table>
         </div>
       `;
+    } else if (type === 'drug') {
+      tableHtml = `
+        <div class="table-wrap" style="box-shadow:none;">
+          <table class="data-table">
+            <thead>
+              <tr><th>Code</th><th>Drug Name</th><th>Category</th><th>Unit</th><th>Batch No</th><th>Quantity</th><th>Threshold</th><th>Expiry</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              ${list.map(d => {
+                const stock = d.stock || { quantity_on_hand: 0, reorder_threshold: 0, max_threshold: null };
+                return `
+                  <tr>
+                    <td><span class="cell-code" style="font-weight:700; color:var(--color-primary);">${UI.escapeHtml(d.drug_code || '—')}</span></td>
+                    <td class="cell-primary">
+                      <div style="font-weight:600;">${UI.escapeHtml(d.name)}</div>
+                      ${d.description ? `<div style="font-size:11px; color:var(--color-text-muted);">${UI.escapeHtml(d.description)}</div>` : ''}
+                    </td>
+                    <td><span class="badge badge-neutral" style="font-size:11px;">${UI.escapeHtml(d.category || '—')}</span></td>
+                    <td class="cell-muted" style="font-size:12px;">${UI.escapeHtml(d.unit || '—')}</td>
+                    <td class="cell-muted" style="font-family:monospace; font-size:11.5px;">${UI.escapeHtml(d.batch_no || '—')}</td>
+                    <td style="font-weight:700;">${stock.quantity_on_hand}</td>
+                    <td class="cell-muted">${stock.reorder_threshold}</td>
+                    <td class="cell-muted">${d.expiry_date ? UI.formatDate(d.expiry_date) : '<span class="text-muted">—</span>'}</td>
+                    <td>${UI.stockBadge(stock)}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
     }
     container.innerHTML = tableHtml;
   }
@@ -253,6 +284,291 @@ window.drilldownLabStatus = (statusKey) => {
   openDrilldownModal(`Lab Orders (${statusKey.replace(/_/g, ' ')})`, 'Filtered by status', filtered, 'labOrder');
 };
 
+window.drilldownDrugCategory = (categoryKey) => {
+  const filtered = globalDataCache.drugs.filter(d => (d.category || 'Uncategorized') === categoryKey);
+  openDrilldownModal(`Drugs in ${categoryKey}`, 'Filtered by clinical category', filtered, 'drug');
+};
+
+window.drilldownDrugStockStatus = (statusKey) => {
+  const now = new Date();
+  const sixMo = new Date();
+  sixMo.setMonth(sixMo.getMonth() + 6);
+
+  const filtered = globalDataCache.drugs.filter(d => {
+    const s = d.stock || {};
+    const q = Number(s.quantity_on_hand) || 0;
+    const t = Number(s.reorder_threshold) || 0;
+    const m = s.max_threshold !== null && s.max_threshold !== undefined ? Number(s.max_threshold) : null;
+
+    if (statusKey === 'expired') {
+      if (!d.expiry_date) return false;
+      return new Date(d.expiry_date) < now;
+    }
+    if (statusKey === 'expiring_soon') {
+      if (!d.expiry_date) return false;
+      const exp = new Date(d.expiry_date);
+      return exp >= now && exp <= sixMo;
+    }
+    if (statusKey === 'out_of_stock') return q === 0;
+    if (statusKey === 'low_stock') return q > 0 && q <= t;
+    if (statusKey === 'overstocked') return m !== null && q > m;
+    if (statusKey === 'in_stock') return q > t && (m === null || q <= m);
+    return true;
+  });
+  openDrilldownModal(`Drugs (${statusKey.replace(/_/g, ' ')})`, 'Filtered by stock condition', filtered, 'drug');
+};
+
+
+function filterListByDateRange(list, dateField, start, end) {
+  if (!start && !end) return list;
+  return list.filter(item => {
+    const raw = item[dateField];
+    if (!raw) return false;
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return false;
+    if (start && d < start) return false;
+    if (end && d > end) return false;
+    return true;
+  });
+}
+
+function renderReportsData() {
+  const periodSelect = document.getElementById('report-period-select');
+  const customContainer = document.getElementById('custom-date-container');
+  const activeLabel = document.getElementById('period-active-label');
+  const startInput = document.getElementById('report-start-date');
+  const endInput = document.getElementById('report-end-date');
+
+  const preset = periodSelect ? periodSelect.value : 'all';
+  if (customContainer) {
+    customContainer.style.display = preset === 'custom' ? 'flex' : 'none';
+  }
+
+  const { start, end, label } = UI.getDateRangeFromPreset(
+    preset,
+    startInput ? startInput.value : null,
+    endInput ? endInput.value : null
+  );
+
+  if (activeLabel) {
+    activeLabel.textContent = `Showing: ${label}`;
+  }
+
+  const { patients = [], visits = [], registrations = [], certifications = [], admissions = [], labOrders = [], drugs = [] } = globalDataCache;
+
+  // Filter datasets by selected time range
+  const filteredVisits = filterListByDateRange(visits, 'visit_date', start, end);
+  const filteredRegs = filterListByDateRange(registrations, 'registration_date', start, end);
+  const filteredCerts = filterListByDateRange(certifications, 'examination_date', start, end);
+  const filteredLabs = filterListByDateRange(labOrders, 'order_date', start, end);
+  const filteredPatients = filterListByDateRange(patients, 'registered_date', start, end);
+  const filteredAdmissions = filterListByDateRange(admissions, 'admission_date', start, end);
+
+  // Overview stats (Total Patients, Open Visits, Admissions, Pending Labs)
+  const totalPatients = filteredPatients.length;
+  const activePatients = filteredPatients.filter(p => p.is_active).length;
+  const openVisits = filteredVisits.filter(v => v.status !== 'closed').length;
+  const activeAdmissions = filteredAdmissions.filter(a => a.status === 'admitted').length;
+  const pendingLab = filteredLabs.filter(o => o.status !== 'completed').length;
+
+  document.getElementById('overview-stats').innerHTML = `
+    <div class="stat-card" style="cursor:pointer;" onclick="window.drilldownPatientDept('all')">
+      <div><div class="label">Clinic Patients</div><div class="value">${totalPatients} <span style="font-size:12px; font-weight:400; color:#647572;">(${activePatients} active)</span></div></div>
+      <div class="stat-icon">${Icons.render('patients')}</div>
+    </div>
+    <div class="stat-card">
+      <div><div class="label">Open Visits</div><div class="value">${openVisits}</div></div>
+      <div class="stat-icon info">${Icons.render('activity')}</div>
+    </div>
+    <div class="stat-card">
+      <div><div class="label">Admitted Patients</div><div class="value">${activeAdmissions}</div></div>
+      <div class="stat-icon amber">${Icons.render('admissions')}</div>
+    </div>
+    <div class="stat-card">
+      <div><div class="label">Lab Orders Pending</div><div class="value">${pendingLab}</div></div>
+      <div class="stat-icon success">${Icons.render('flask')}</div>
+    </div>
+  `;
+
+  // 1. Patient Analytics — Breakdown by Department
+  const patientDeptCounts = {};
+  filteredPatients.forEach(p => {
+    const dept = p.department || 'Unassigned';
+    patientDeptCounts[dept] = (patientDeptCounts[dept] || 0) + 1;
+  });
+
+  const deptPalette = {
+    'Manager': '#12817A',
+    'Finance': '#3C7FB0',
+    'Human Resource Management': '#D98B3F',
+    'Planning and Budget Service': '#8E44AD',
+    'Production Quality Control Service': '#27AE60',
+    'Product Quality Control Service': '#27AE60',
+    'Production': '#E67E22',
+    'Technic': '#D35400',
+    'Technique': '#D35400',
+    'Production and Technique': '#E67E22',
+    'Production and Technic': '#E67E22',
+    'Property Management': '#2C3E50',
+    'Unassigned': '#93A19E',
+  };
+
+
+  document.getElementById('patient-dept-breakdown').innerHTML = Object.keys(patientDeptCounts).length
+    ? donut(patientDeptCounts, deptPalette, 'patients', 'window.drilldownPatientDept')
+    : emptyNote('No patients found for this period.');
+
+  // 2. Patient Analytics — Breakdown by Gender
+  const patientGenderCounts = {};
+  filteredPatients.forEach(p => {
+    const gen = (p.gender || 'unspecified').toLowerCase();
+    patientGenderCounts[gen] = (patientGenderCounts[gen] || 0) + 1;
+  });
+
+  document.getElementById('patient-gender-breakdown').innerHTML = Object.keys(patientGenderCounts).length
+    ? donut(patientGenderCounts, { male: '#3C7FB0', female: '#D9534F', unspecified: '#93A19E' }, 'patients', 'window.drilldownPatientGender')
+    : emptyNote('No patient demographics found.');
+
+  // 3. Registration status breakdown
+  const regCounts = {};
+  filteredRegs.forEach(r => { regCounts[r.status] = (regCounts[r.status] || 0) + 1; });
+  document.getElementById('registration-breakdown').innerHTML = Object.keys(regCounts).length
+    ? donut(regCounts, {
+        pending: '#3C7FB0', certified_fit: '#2E9E6F', certified_unfit: '#C0483C',
+        hired: '#12817A', withdrawn: '#93A19E', accepted_as_staff: '#8E44AD',
+      }, 'candidates', 'window.drilldownRegStatus')
+    : emptyNote('No registrations found for this period.');
+
+  // 4. Certification results
+  const certCounts = { fit: 0, unfit: 0 };
+  filteredCerts.forEach(c => { certCounts[c.result] = (certCounts[c.result] || 0) + 1; });
+  document.getElementById('certification-breakdown').innerHTML = filteredCerts.length
+    ? donut(certCounts, { fit: '#2E9E6F', unfit: '#C0483C' }, 'exams', 'window.drilldownCertResult')
+    : emptyNote('No certification exams found for this period.');
+
+  // 5. Visit disposition breakdown (closed visits only)
+  const closedVisits = filteredVisits.filter(v => v.status === 'closed');
+  const dispCounts = {};
+  closedVisits.forEach(v => { const key = v.disposition || 'unspecified'; dispCounts[key] = (dispCounts[key] || 0) + 1; });
+  document.getElementById('disposition-breakdown').innerHTML = closedVisits.length
+    ? donut(dispCounts, { discharged: '#2E9E6F', admitted: '#3C7FB0', referred: '#D98B3F', unspecified: '#93A19E' }, 'closed visits', 'window.drilldownVisitDisp')
+    : emptyNote('No closed visits found for this period.');
+
+  // 6. Lab order status breakdown
+  const labCounts = { pending: 0, in_progress: 0, completed: 0 };
+  filteredLabs.forEach(o => { labCounts[o.status] = (labCounts[o.status] || 0) + 1; });
+  document.getElementById('lab-breakdown').innerHTML = filteredLabs.length
+    ? donut(labCounts, { pending: '#93A19E', in_progress: '#D98B3F', completed: '#2E9E6F' }, 'lab orders', 'window.drilldownLabStatus')
+    : emptyNote('No lab orders found for this period.');
+
+  // 7. Drug Stock Breakdown by Category (Pie / Donut Chart)
+  const drugCategoryCounts = {};
+  drugs.forEach(d => {
+    const cat = d.category || 'Uncategorized';
+    drugCategoryCounts[cat] = (drugCategoryCounts[cat] || 0) + 1;
+  });
+
+  const drugCategoryPalette = {
+    'Anti Acid drugs': '#12817A',
+    'Eye ointment': '#3C7FB0',
+    'Skin ointment': '#D98B3F',
+    'Iv Fluid': '#8E44AD',
+    'Syringe': '#27AE60',
+    'Anti Pain': '#E74C3C',
+    'Dressing materials': '#E67E22',
+    'Disinfectant solution': '#16A085',
+    'Adhesive Plaster': '#2980B9',
+    'Anti bacterial Drug': '#C0392B',
+    'Cardiovascular Drug (CVS)': '#884EA0',
+    'Anti diabetic': '#2471A3',
+    'minerals': '#17A589',
+    'Anti protocol': '#D35400',
+    'Anti Inflammatory Drugs': '#B03A2E',
+    'Uncategorized': '#93A19E',
+    'Other': '#7F8C8D',
+  };
+
+  const drugCatEl = document.getElementById('drug-category-breakdown');
+  if (drugCatEl) {
+    drugCatEl.innerHTML = Object.keys(drugCategoryCounts).length
+      ? donut(drugCategoryCounts, drugCategoryPalette, 'drugs', 'window.drilldownDrugCategory')
+      : emptyNote('No drugs found in formulary.');
+  }
+
+  // 8. Drug Stock Breakdown by Condition & Expiry
+  const drugStockStatusCounts = {
+    in_stock: 0,
+    low_stock: 0,
+    out_of_stock: 0,
+    overstocked: 0,
+    expiring_soon: 0,
+    expired: 0,
+  };
+
+  const now = new Date();
+  const sixMo = new Date();
+  sixMo.setMonth(sixMo.getMonth() + 6);
+
+  drugs.forEach(d => {
+    const s = d.stock || {};
+    const q = Number(s.quantity_on_hand) || 0;
+    const t = Number(s.reorder_threshold) || 0;
+    const m = s.max_threshold !== null && s.max_threshold !== undefined ? Number(s.max_threshold) : null;
+
+    if (d.expiry_date) {
+      const exp = new Date(d.expiry_date);
+      if (exp < now) drugStockStatusCounts.expired++;
+      else if (exp <= sixMo) drugStockStatusCounts.expiring_soon++;
+    }
+
+    if (q === 0) drugStockStatusCounts.out_of_stock++;
+    else if (q <= t) drugStockStatusCounts.low_stock++;
+    else if (m !== null && q > m) drugStockStatusCounts.overstocked++;
+    else drugStockStatusCounts.in_stock++;
+  });
+
+  const activeDrugStockStatus = {};
+  Object.keys(drugStockStatusCounts).forEach(k => {
+    if (drugStockStatusCounts[k] > 0) activeDrugStockStatus[k] = drugStockStatusCounts[k];
+  });
+
+  const drugStatusPalette = {
+    in_stock: '#2E9E6F',
+    low_stock: '#D98B3F',
+    out_of_stock: '#C0483C',
+    overstocked: '#3C7FB0',
+    expiring_soon: '#E67E22',
+    expired: '#8E44AD',
+  };
+
+  const drugStockEl = document.getElementById('drug-stock-status-breakdown');
+  if (drugStockEl) {
+    drugStockEl.innerHTML = Object.keys(activeDrugStockStatus).length
+      ? donut(activeDrugStockStatus, drugStatusPalette, 'items', 'window.drilldownDrugStockStatus')
+      : emptyNote('No stock records available.');
+  }
+
+  // 9. Low stock drugs
+  const lowStock = drugs.filter(d => d.stock && d.stock.quantity_on_hand <= d.stock.reorder_threshold);
+  document.getElementById('low-stock-count').textContent = `${lowStock.length} drug(s)`;
+  document.getElementById('low-stock-region').innerHTML = lowStock.length ? `
+    <div class="table-wrap" style="box-shadow:none;">
+      <table class="data-table">
+        <thead><tr><th>Drug</th><th>Category</th><th>On hand</th><th>Reorder threshold</th></tr></thead>
+        <tbody>
+          ${lowStock.map(d => `
+            <tr>
+              <td class="cell-primary">${UI.escapeHtml(d.name)}</td>
+              <td><span class="badge badge-neutral" style="font-size:11.5px;">${UI.escapeHtml(d.category || '—')}</span></td>
+              <td class="cell-muted" style="font-weight:700;">${d.stock.quantity_on_hand} ${UI.escapeHtml(d.unit || '')}</td>
+              <td class="cell-muted">${d.stock.reorder_threshold}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  ` : emptyNote('All drugs are above their reorder threshold.');
+}
 
 async function init() {
   try {
@@ -270,119 +586,27 @@ async function init() {
 
     const exportBtn = document.getElementById('open-export-modal-btn');
     if (exportBtn) {
-      exportBtn.addEventListener('click', () => ExportModal.open('patients'));
+      exportBtn.addEventListener('click', () => {
+        const periodSelect = document.getElementById('report-period-select');
+        const startDate = document.getElementById('report-start-date');
+        const endDate = document.getElementById('report-end-date');
+        const currentPeriod = periodSelect ? periodSelect.value : 'all';
+        const currentStart = startDate ? startDate.value : null;
+        const currentEnd = endDate ? endDate.value : null;
+        ExportModal.open('patients', currentPeriod, currentStart, currentEnd);
+      });
     }
 
-    // Overview stats (Total Patients under clinic, Open Visits, Admissions, Pending Labs)
-    const totalPatients = patients.length;
-    const activePatients = patients.filter(p => p.is_active).length;
-    const openVisits = visits.filter(v => v.status !== 'closed').length;
-    const activeAdmissions = admissions.filter(a => a.status === 'admitted').length;
-    const pendingLab = labOrders.filter(o => o.status !== 'completed').length;
+    const periodSelect = document.getElementById('report-period-select');
+    if (periodSelect) {
+      periodSelect.addEventListener('change', renderReportsData);
+    }
+    const startDate = document.getElementById('report-start-date');
+    const endDate = document.getElementById('report-end-date');
+    if (startDate) startDate.addEventListener('change', renderReportsData);
+    if (endDate) endDate.addEventListener('change', renderReportsData);
 
-    document.getElementById('overview-stats').innerHTML = `
-      <div class="stat-card" style="cursor:pointer;" onclick="window.drilldownPatientDept('all')">
-        <div><div class="label">Total Clinic Patients</div><div class="value">${totalPatients} <span style="font-size:12px; font-weight:400; color:#647572;">(${activePatients} active)</span></div></div>
-        <div class="stat-icon">${Icons.render('patients')}</div>
-      </div>
-      <div class="stat-card">
-        <div><div class="label">Open Visits</div><div class="value">${openVisits}</div></div>
-        <div class="stat-icon info">${Icons.render('activity')}</div>
-      </div>
-      <div class="stat-card">
-        <div><div class="label">Currently Admitted</div><div class="value">${activeAdmissions}</div></div>
-        <div class="stat-icon amber">${Icons.render('admissions')}</div>
-      </div>
-      <div class="stat-card">
-        <div><div class="label">Lab Orders Pending</div><div class="value">${pendingLab}</div></div>
-        <div class="stat-icon success">${Icons.render('flask')}</div>
-      </div>
-    `;
-
-    // 1. Patient Analytics — Breakdown by Department
-    const patientDeptCounts = {};
-    patients.forEach(p => {
-      const dept = p.department || 'Unassigned';
-      patientDeptCounts[dept] = (patientDeptCounts[dept] || 0) + 1;
-    });
-
-    const deptPalette = {
-      'Medical': '#12817A',
-      'Finance': '#3C7FB0',
-      'Human Resource Management': '#D98B3F',
-      'Planning and Budget Service': '#8E44AD',
-      'Product Quality Control Service': '#27AE60',
-      'Production and Technic': '#E67E22',
-      'Property Management': '#2C3E50',
-      'Unassigned': '#93A19E',
-    };
-
-    document.getElementById('patient-dept-breakdown').innerHTML = Object.keys(patientDeptCounts).length
-      ? donut(patientDeptCounts, deptPalette, 'patients', 'window.drilldownPatientDept')
-      : emptyNote('No patients registered yet.');
-
-    // 2. Patient Analytics — Breakdown by Gender
-    const patientGenderCounts = {};
-    patients.forEach(p => {
-      const gen = (p.gender || 'unspecified').toLowerCase();
-      patientGenderCounts[gen] = (patientGenderCounts[gen] || 0) + 1;
-    });
-
-    document.getElementById('patient-gender-breakdown').innerHTML = Object.keys(patientGenderCounts).length
-      ? donut(patientGenderCounts, { male: '#3C7FB0', female: '#D9534F', unspecified: '#93A19E' }, 'patients', 'window.drilldownPatientGender')
-      : emptyNote('No patients recorded.');
-
-    // 3. Registration status breakdown
-    const regCounts = {};
-    registrations.forEach(r => { regCounts[r.status] = (regCounts[r.status] || 0) + 1; });
-    document.getElementById('registration-breakdown').innerHTML = Object.keys(regCounts).length
-      ? donut(regCounts, {
-          pending: '#3C7FB0', certified_fit: '#2E9E6F', certified_unfit: '#C0483C',
-          hired: '#12817A', withdrawn: '#93A19E', accepted_as_staff: '#8E44AD',
-        }, 'candidates', 'window.drilldownRegStatus')
-      : emptyNote('No registrations recorded yet.');
-
-    // 4. Certification results
-    const certCounts = { fit: 0, unfit: 0 };
-    certifications.forEach(c => { certCounts[c.result] = (certCounts[c.result] || 0) + 1; });
-    document.getElementById('certification-breakdown').innerHTML = certifications.length
-      ? donut(certCounts, { fit: '#2E9E6F', unfit: '#C0483C' }, 'exams', 'window.drilldownCertResult')
-      : emptyNote('No certification exams recorded yet.');
-
-    // 5. Visit disposition breakdown (closed visits only)
-    const closedVisits = visits.filter(v => v.status === 'closed');
-    const dispCounts = {};
-    closedVisits.forEach(v => { const key = v.disposition || 'unspecified'; dispCounts[key] = (dispCounts[key] || 0) + 1; });
-    document.getElementById('disposition-breakdown').innerHTML = closedVisits.length
-      ? donut(dispCounts, { discharged: '#2E9E6F', admitted: '#3C7FB0', referred: '#D98B3F', unspecified: '#93A19E' }, 'closed visits', 'window.drilldownVisitDisp')
-      : emptyNote('No closed visits yet.');
-
-    // 6. Lab order status breakdown
-    const labCounts = { pending: 0, in_progress: 0, completed: 0 };
-    labOrders.forEach(o => { labCounts[o.status] = (labCounts[o.status] || 0) + 1; });
-    document.getElementById('lab-breakdown').innerHTML = labOrders.length
-      ? donut(labCounts, { pending: '#93A19E', in_progress: '#D98B3F', completed: '#2E9E6F' }, 'lab orders', 'window.drilldownLabStatus')
-      : emptyNote('No lab orders recorded yet.');
-
-    // 7. Low stock drugs
-    const lowStock = drugs.filter(d => d.stock && d.stock.quantity_on_hand <= d.stock.reorder_threshold);
-    document.getElementById('low-stock-count').textContent = `${lowStock.length} drug(s)`;
-    document.getElementById('low-stock-region').innerHTML = lowStock.length ? `
-      <div class="table-wrap" style="box-shadow:none;">
-        <table class="data-table">
-          <thead><tr><th>Drug</th><th>On hand</th><th>Reorder threshold</th></tr></thead>
-          <tbody>
-            ${lowStock.map(d => `
-              <tr>
-                <td class="cell-primary">${UI.escapeHtml(d.name)}</td>
-                <td class="cell-muted">${d.stock.quantity_on_hand} ${UI.escapeHtml(d.unit || '')}</td>
-                <td class="cell-muted">${d.stock.reorder_threshold}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    ` : emptyNote('All drugs are above their reorder threshold.');
+    renderReportsData();
 
   } catch (e) {
     UI.toast(UI.errorMessage(e), 'danger');

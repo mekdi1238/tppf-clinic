@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Activity & Audit Logs · TPPF Clinic</title>
+  <meta name="description" content="Chronological record of user activities, data modifications, and security events." />
+  <link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    .audit-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .audit-stat-card {
+      background: var(--color-surface, #ffffff);
+      border: 1px solid var(--color-border, #e2e8f0);
+      border-radius: var(--radius-md, 8px);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05));
+    }
+    .audit-stat-card .label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--color-text-muted, #64748b);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .audit-stat-card .value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--color-text, #0f172a);
+    }
+    .action-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    .action-create { background: #dcfce7; color: #15803d; }
+    .action-update { background: #e0f2fe; color: #0369a1; }
+    .action-delete { background: #fee2e2; color: #b91c1c; }
+    .action-login  { background: #f3e8ff; color: #7e22ce; }
+    .action-dispense { background: #ccfbf1; color: #0f766e; }
+    .action-import { background: #fef3c7; color: #b45309; }
+    .action-other  { background: #f1f5f9; color: #475569; }
+
+    .module-tag {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--color-text-muted, #475569);
+      background: var(--color-bg-secondary, #f1f5f9);
+      padding: 2px 7px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+
+    .diff-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    @media (max-width: 768px) {
+      .diff-container { grid-template-columns: 1fr; }
+    }
+    .diff-box {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 12px;
+      border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.8rem;
+      max-height: 280px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .diff-label {
+      font-weight: 600;
+      font-size: 0.82rem;
+      margin-bottom: 4px;
+      color: var(--color-text-muted, #64748b);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" id="page-content">
+
+        <!-- Top summary statistics -->
+        <div class="audit-stats-grid">
+          <div class="audit-stat-card">
+            <span class="label">Total Activity Logs</span>
+            <span class="value" id="stat-total">-</span>
+          </div>
+          <div class="audit-stat-card">
+            <span class="label">Actions Today</span>
+            <span class="value" id="stat-today">-</span>
+          </div>
+          <div class="audit-stat-card">
+            <span class="label">Active Users (7 Days)</span>
+            <span class="value" id="stat-users">-</span>
+          </div>
+        </div>
+
+        <!-- Filter and Search Toolbar -->
+        <div class="page-toolbar" style="flex-wrap: wrap; gap: 10px;">
+          <div class="toolbar-filters" style="flex-wrap: wrap; gap: 8px;">
+            <div class="search-box" style="min-width: 220px;">
+              <span id="search-icon-slot"></span>
+              <input type="text" id="search-input" placeholder="Search activity, description, user…" />
+            </div>
+
+            <select class="select-filter" id="module-filter">
+              <option value="all">All Modules</option>
+              <option value="patients">Patients</option>
+              <option value="visits">Visits</option>
+              <option value="admissions">Admissions</option>
+              <option value="checkups">Check-ups</option>
+              <option value="registrations">Registrations</option>
+              <option value="certifications">Certifications</option>
+              <option value="laboratory">Laboratory</option>
+              <option value="pharmacy">Pharmacy</option>
+              <option value="referrals">Referrals</option>
+              <option value="users">Users & Access</option>
+              <option value="staff">Staff</option>
+              <option value="settings">Settings</option>
+              <option value="backups">Backups</option>
+              <option value="auth">Sign-In / Auth</option>
+            </select>
+
+            <select class="select-filter" id="action-filter">
+              <option value="all">All Actions</option>
+              <option value="create">Create</option>
+              <option value="update">Update</option>
+              <option value="delete">Delete</option>
+              <option value="login">Login</option>
+              <option value="dispense">Dispense</option>
+              <option value="import">Import</option>
+            </select>
+
+            <select class="select-filter" id="user-filter">
+              <option value="all">All Users</option>
+            </select>
+
+            <input type="date" class="select-filter" id="start-date" title="Start date" />
+            <input type="date" class="select-filter" id="end-date" title="End date" />
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary" id="reset-filters-btn" title="Reset all filters">Reset</button>
+            <button class="btn btn-primary" id="refresh-btn">
+              <span id="refresh-icon-slot"></span> Refresh
+            </button>
+          </div>
+        </div>
+
+        <!-- Audit Log Data Table Region -->
+        <div id="audit-table-region"></div>
+
+        <!-- Pagination Bar -->
+        <div id="audit-pagination-region" style="margin-top: 16px;"></div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Detail / JSON Inspector Modal -->
+  <div class="modal-backdrop" id="audit-modal-backdrop">
+    <div class="modal" style="max-width: 720px;">
+      <div class="modal-header">
+        <div>
+          <h2 id="modal-title">Activity Details</h2>
+          <p id="modal-subtitle">Log record snapshot and metadata</p>
+        </div>
+        <button class="icon-btn" id="audit-modal-close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid" style="margin-bottom: 16px;">
+          <div class="detail-item"><div class="k">Timestamp</div><div class="v" id="dt-timestamp">-</div></div>
+          <div class="detail-item"><div class="k">User</div><div class="v" id="dt-user">-</div></div>
+          <div class="detail-item"><div class="k">IP Address</div><div class="v" id="dt-ip">-</div></div>
+          <div class="detail-item"><div class="k">Module & Action</div><div class="v" id="dt-action">-</div></div>
+          <div class="detail-item" style="grid-column: 1 / -1;"><div class="k">Description</div><div class="v" id="dt-description">-</div></div>
+        </div>
+
+        <div id="diff-section">
+          <div class="diff-container">
+            <div>
+              <div class="diff-label">State Before (Old)</div>
+              <pre class="diff-box" id="diff-before">None</pre>
+            </div>
+            <div>
+              <div class="diff-label">State After / Payload (New)</div>
+              <pre class="diff-box" id="diff-after">None</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 12px 16px; display: flex; justify-content: flex-end;">
+        <button class="btn btn-secondary" id="audit-modal-ok">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/permissions.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/audit-logs.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<title>Periodic Check-ups · TPPF Clinic</title>
+<link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="shell-root"></div>
+    <div class="main" id="main-root">
+      <main class="content" style="padding:24px;">
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+          <div>
+            <h2 style="margin:0; font-size:20px; font-weight:700; color:var(--color-text-heading, #0A4F49);">Periodic 6-Month Medical Fitness Check-ups</h2>
+            <p class="text-muted" style="margin:4px 0 0 0; font-size:13px;">Track active employee medical fit cards, 6-month expiry notices, and renewal check-up visits.</p>
+          </div>
+        </div>
+
+        <!-- Toolbar Filters -->
+        <div class="page-toolbar" style="margin-bottom:20px;">
+          <div class="toolbar-filters">
+            <div class="search-box">
+              <span id="search-icon-slot"></span>
+              <input type="text" id="checkup-search-input" placeholder="Search employee by name or code…" />
+            </div>
+            <select class="select-filter" id="dept-filter-select">
+              <option value="all">All departments</option>
+              <option value="Manager">Manager</option>
+              <option value="Human Resource Management">Human Resource Management</option>
+              <option value="Planning and Budget Service">Planning and Budget Service</option>
+              <option value="Production Quality Control Service">Production Quality Control Service</option>
+              <option value="Production">Production</option>
+              <option value="Technic">Technic</option>
+              <option value="Property Management">Property Management</option>
+              <option value="Finance">Finance</option>
+            </select>
+            <select class="select-filter" id="status-filter-select">
+              <option value="all">All statuses</option>
+              <option value="active_fit">Active Fit (Valid)</option>
+              <option value="due_soon">Notice: Renewal Due Soon (≤ 7 days)</option>
+              <option value="overdue">Expired (Overdue)</option>
+              <option value="no_certificate">No Certificate Recorded</option>
+              <option value="renewal_visit_created">Renewal Visit Created</option>
+            </select>
+          </div>
+          <button type="button" class="btn btn-secondary" id="checkup-reset-btn" title="Reset all filters">Reset</button>
+        </div>
+
+        <div id="checkups-table-region"></div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  
+  <script src="js/auth.js"></script>
+  <script src="js/permissions.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/checkups.js"></script>
+</body>
+</html>
+
+

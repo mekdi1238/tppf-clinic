@@ -32,19 +32,64 @@ const ImportModal = (() => {
       templateRow: 'Marta Lemma,1988-11-02,female,Finance,Accountant,Addis Ababa,Bole Woreda 03,0911223344',
       note: 'Required: full_name. All other fields are optional.',
     },
+    drugs: {
+      label: 'Pharmacy Drugs & Formulary',
+      endpoint: (opts) => Api.drugs.import,
+      requiredFields: ['name'],
+      allFields: ['drug_code', 'name', 'category', 'unit', 'batch_no', 'reorder_threshold', 'max_threshold', 'quantity_on_hand', 'expiry_date', 'description'],
+      templateHeaders: 'item_code,item_name,category,unit,batch_no,min_threshold,max_threshold,quantity,expiration_date',
+      templateRow: 'D001,Omeprazole 20mg,Anti Acid drugs,capsul,B10429,20,500,150,2027-05-30\nD002,Paracetamol 500mg,Anti Pain,strips,BT-9921,50,1000,300,2026-12-15\nD003,Normal Saline 0.9%,Iv Fluid,bottle,NS-4421,10,200,45,2028-01-10',
+      note: 'Required: item_name. Optional: item_code (auto-generated D... if omitted), category (e.g. Anti Acid drugs, Anti Pain, Iv Fluid), unit (e.g. bottle, strips, capsul, packet, sachet), batch_no, min_threshold, max_threshold, quantity, expiration_date (YYYY-MM-DD).',
+
+    },
   };
 
   const VALID_DEPARTMENTS = [
-    'Medical', 'Finance', 'Human Resource Management',
-    'Planning and Budget Service', 'Product Quality Control Service',
-    'Production and Technic', 'Property Management',
+    'Manager', 'Finance', 'Human Resource Management',
+    'Planning and Budget Service', 'Production Quality Control Service',
+    'Production', 'Technic', 'Technique', 'Technician',
+    'Production and Technique', 'Production and Technic', 'Property Management',
   ];
+
+
+  const HEADER_ALIASES = {
+    item: 'name',
+    item_name: 'name',
+    drug: 'name',
+    drug_name: 'name',
+    item_code: 'drug_code',
+    id: 'drug_code',
+    code: 'drug_code',
+    min: 'reorder_threshold',
+    threshold: 'reorder_threshold',
+    min_threshold: 'reorder_threshold',
+    minimum: 'reorder_threshold',
+    max: 'max_threshold',
+    maximum: 'max_threshold',
+    max_threshold: 'max_threshold',
+    qty: 'quantity_on_hand',
+    quantity: 'quantity_on_hand',
+    initial_quantity: 'quantity_on_hand',
+    stock: 'quantity_on_hand',
+    expiration_date: 'expiry_date',
+    expiry: 'expiry_date',
+    expiration: 'expiry_date',
+    batch: 'batch_no',
+    batch_number: 'batch_no',
+    lot: 'batch_no',
+    lot_number: 'batch_no',
+    measurement: 'unit',
+    unit_measurement: 'unit',
+  };
 
   /* ── CSV parser ──────────────────────────────────────────── */
   function parseCsv(text) {
-    const lines = text.trim().split(/\r?\n/);
+    // Strip UTF-8 BOM if present
+    const cleanText = text.replace(/^\uFEFF/, '').trim();
+    const lines = cleanText.split(/\r?\n/);
     if (lines.length < 2) return { headers: [], rows: [] };
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, '_'));
+    const rawHeaders = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[\s\[\]\(\)\-\.]+/g, '_').replace(/^_+|_+$/g, ''));
+    const headers = rawHeaders.map(h => HEADER_ALIASES[h] || h);
     const rows = [];
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -151,6 +196,10 @@ const ImportModal = (() => {
                   <span id="imp-dl-icon"></span> Download CSV Template
                 </button>
                 <button type="button" class="btn btn-primary" id="imp-parse-btn">Preview Data →</button>
+              </div>
+
+              <div style="font-size:11.5px; color:var(--color-text-muted); margin-top:8px; background:rgba(0,102,204,0.06); padding:8px 10px; border-radius:6px; border-left:3px solid var(--color-primary, #12817A);">
+                💡 <strong>Tip for Amharic / Ethiopic Names in Excel:</strong> When saving from Microsoft Excel, select <strong>"CSV UTF-8 (Comma delimited) (*.csv)"</strong> so Amharic characters (e.g. አበበ በቀለ) are preserved correctly without question marks (????).
               </div>
 
               <div id="imp-parse-error" class="imp-banner imp-banner-error" style="display:none;"></div>
@@ -303,7 +352,7 @@ const ImportModal = (() => {
         processText(text, 'csv');
       }
     };
-    reader.readAsText(file);
+    reader.readAsText(file, 'UTF-8');
   }
 
   function processText(text, format) {
@@ -399,9 +448,13 @@ const ImportModal = (() => {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Importing…';
 
-    const apiCall = currentDatasetKey === 'registrations'
-      ? Api.registrations.import
-      : Api.patients.import;
+    const apiCallMap = {
+      registrations: Api.registrations.import,
+      patients: Api.patients.import,
+      drugs: Api.drugs.import,
+    };
+    const apiCall = apiCallMap[currentDatasetKey] || Api.patients.import;
+
 
     try {
       const result = await apiCall(parsedRows, { atomic: atomicMode });
@@ -505,7 +558,7 @@ const ImportModal = (() => {
     if (!remainingRowsCache || !remainingRowsCache.length) return;
     const keys = Object.keys(remainingRowsCache[0]);
     const csv = [keys.join(','), ...remainingRowsCache.map(r => keys.map(k => `"${(r[k] || '').toString().replace(/"/g, '""')}"`).join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -518,7 +571,7 @@ const ImportModal = (() => {
   function downloadTemplate() {
     const config = DATASET_CONFIGS[currentDatasetKey];
     const csv = config.templateHeaders + '\n' + config.templateRow;
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

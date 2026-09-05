@@ -147,6 +147,16 @@
     margin-bottom: 6px;
     grid-column: 1 / -1;
   }
+
+  /* ── Constrain SVG icons inside the lab order detail modal ── */
+  #order-detail-body svg,
+  #order-detail-body span[style*="inline-flex"] svg {
+    width: 14px !important;
+    height: 14px !important;
+    max-width: 14px !important;
+    max-height: 14px !important;
+    flex-shrink: 0;
+  }
 </style>
 </head>
 <body>
@@ -239,6 +249,16 @@
           </div>
 
           <div id="order-selected-summary" style="font-size:12px; color:var(--color-text-muted); min-height:18px;"></div>
+
+          <!-- Physician note to lab technician -->
+          <div class="field" style="margin-top:4px;">
+            <label for="of-physician-note" style="font-size:13px; font-weight:600;">
+              Note to Lab Technician <span style="font-weight:400; color:var(--color-text-muted);">(optional)</span>
+            </label>
+            <textarea id="of-physician-note" rows="2"
+              placeholder="Add clinical context, urgency, or specific instructions for the lab technician…"
+              style="resize:vertical;"></textarea>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="order-form-cancel">Cancel</button>
@@ -265,10 +285,14 @@
 
   <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
+  
   <script src="js/auth.js"></script>
+  <script src="js/permissions.js"></script>
   <script src="js/roles.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/shell.js"></script>
   <script src="js/laboratory.js"></script>
 </body>
 </html>
+
+

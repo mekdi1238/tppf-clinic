@@ -12,16 +12,22 @@ setPageTitle('Visits');
 // advancing visit status, no originating lab/pharmacy/admission/referral
 // actions from here. Every other allowed role (physician, or unrestricted)
 // keeps full access.
-const isReceptionist = RoleGuard.restrictedRole() === 'receptionist';
+const isReceptionist = typeof RoleGuard !== 'undefined' ? (RoleGuard.restrictedRole() === 'receptionist') : false;
 
 document.getElementById('search-icon-slot').innerHTML = Icons.render('search');
 document.getElementById('plus-icon-slot').innerHTML = Icons.render('plus');
 document.getElementById('visit-modal-close').innerHTML = Icons.render('close');
 document.getElementById('visit-detail-close').innerHTML = Icons.render('close');
 
+const newVisitBtn = document.getElementById('new-visit-btn');
+if (newVisitBtn && typeof Permissions !== 'undefined') {
+  newVisitBtn.style.display = Permissions.has('visits.create') ? 'inline-flex' : 'none';
+}
+
 let patientsCache = [];
 let physiciansCache = [];
 let currentVisits = [];
+let isClinicalNotesDirty = false;
 
 const NEXT_STATUS = { open: 'examined', examined: 'diagnosed', diagnosed: 'closed' };
 const NEXT_STATUS_LABEL = { examined: 'Mark as Examined', diagnosed: 'Confirm Diagnosis', closed: 'Close Visit' };
@@ -90,7 +96,12 @@ function renderTable(list) {
               <td class="cell-muted">${UI.escapeHtml(v.chief_complaint)}</td>
               <td class="cell-muted">${UI.formatDateTime(v.visit_date)}</td>
               <td>${UI.visitStatusBadge(v.status)}</td>
-              <td><button class="icon-btn" title="Open" onclick="openVisitDetail('${v.id}')">${Icons.render('eye')}</button></td>
+              <td>
+                <div style="display:flex; gap:6px; align-items:center;">
+                  <button class="icon-btn" title="Open Visit" onclick="openVisitDetail('${v.id}')">${Icons.render('eye')}</button>
+                  ${Permissions.has('visits.delete') ? `<button class="icon-btn" title="Delete Visit" onclick="event.stopPropagation(); deleteVisit('${v.id}', '${UI.escapeHtml(v.patient ? v.patient.full_name : 'Patient')}')" style="color:var(--color-danger);">${Icons.render('trash')}</button>` : ''}
+                </div>
+              </td>
             </tr>
           `).join('')}
         </tbody>
@@ -165,6 +176,7 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
   document.getElementById('vd-title').textContent = v.patient ? v.patient.full_name : 'Visit';
   document.getElementById('vd-sub').textContent = `${v.patient ? v.patient.patient_code : ''} · ${UI.formatDateTime(v.visit_date)}`;
 
+  isClinicalNotesDirty = false;
   const canEditClinical = v.status !== 'closed' && !isReceptionist;
   const canRecordVitals = v.status !== 'closed';
 
@@ -270,6 +282,14 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
         <textarea id="vd-diagnosis" rows="2" ${canEditClinical ? '' : 'disabled'} placeholder="Required before diagnosis can be confirmed">${UI.escapeHtml(v.diagnosis || '')}</textarea>
       </div>
       <div class="field">
+        <label for="vd-treatment">Treatment</label>
+        <textarea id="vd-treatment" rows="2" ${canEditClinical ? '' : 'disabled'} placeholder="Prescribed treatment, medical procedures, or management plan">${UI.escapeHtml(v.treatment || '')}</textarea>
+      </div>
+      <div class="field">
+        <label for="vd-hr-note">Note to HR / Physician Advice</label>
+        <textarea id="vd-hr-note" rows="2" ${canEditClinical ? '' : 'disabled'} placeholder="Optional note directed to the HR department regarding fitness, light duty, etc.">${UI.escapeHtml(v.hr_note || '')}</textarea>
+      </div>
+      <div class="field">
         <label for="vd-disposition">Disposition</label>
         <select id="vd-disposition" ${canEditClinical ? '' : 'disabled'}>
           <option value="">Not yet decided</option>
@@ -294,7 +314,7 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
           ${Icons.render('alert')}
           <span>Disposition is "Admitted" but no admission record exists yet. One is required before this visit can close.</span>
         </div>
-        ${isReceptionist ? '' : `<a href="admissions.html?newFor=${v.id}" class="btn btn-secondary btn-sm">${Icons.render('plus')} Create Admission Record</a>`}
+        ${isReceptionist ? '' : `<a href="admissions.html?newFor=${v.id}" class="btn btn-secondary btn-sm requires-saved-notes">${Icons.render('plus')} Create Admission Record</a>`}
       ` : `<p class="text-muted" style="font-size:12.5px;">Not applicable unless disposition is set to "Admitted".</p>`}
     </div>
 
@@ -306,11 +326,14 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
             <div class="timeline-item">
               <div class="timeline-dot"></div>
               <div class="timeline-body">
-                <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
                   <div class="t" style="margin-bottom:0;">Order ${UI.labOrderStatusBadge(o.status)}</div>
-                  <div class="d">${UI.formatDateTime(o.order_date)}</div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <div class="d">${UI.formatDateTime(o.order_date)}</div>
+                    ${!isReceptionist ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--color-danger); padding:2px 6px; font-size:11px; display:inline-flex; align-items:center; gap:3px;" title="Delete Lab Order" onclick="deleteLabOrderFromVisit('${o.id}', '${v.id}')">${Icons.render('trash')} Delete</button>` : ''}
+                  </div>
                 </div>
-                <div class="table-wrap" style="box-shadow:none; border:1px solid var(--color-border-subtle); border-radius:4px; padding:0;">
+              <div class="table-wrap" style="box-shadow:none; border:1px solid var(--color-border-subtle); border-radius:4px; padding:0;">
                   <table class="data-table" style="font-size: 13px;">
                     <tbody>
                       ${o.items.map(i => `
@@ -322,12 +345,32 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
                     </tbody>
                   </table>
                 </div>
+                ${(o.physician_note || o.technician_note) ? `
+                  <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+                    ${o.physician_note ? `
+                      <div style="background:var(--color-info-light); border:1px solid var(--color-info); border-left:4px solid var(--color-info); border-radius:8px; padding:9px 12px; font-size:13px;">
+                        <div style="font-size:11px; font-weight:700; color:var(--color-info); text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px;">
+                          ${UI.escapeHtml(o.physician_full_name || (physiciansCache.find(p => String(p.id) === String(o.physician_id))?.full_name) || 'Physician')}:
+                        </div>
+                        <div style="white-space:pre-wrap; color:var(--color-text);">${UI.escapeHtml(o.physician_note)}</div>
+                      </div>
+                    ` : ''}
+                    ${o.technician_note ? `
+                      <div style="background:var(--color-accent-light); border:1px solid var(--color-accent); border-left:4px solid var(--color-accent); border-radius:8px; padding:9px 12px; font-size:13px;">
+                        <div style="font-size:11px; font-weight:700; color:var(--color-accent); text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px;">
+                          ${UI.escapeHtml(o.technician_name || 'Lab Technician')}:
+                        </div>
+                        <div style="white-space:pre-wrap; color:var(--color-text);">${UI.escapeHtml(o.technician_note)}</div>
+                      </div>
+                    ` : ''}
+                  </div>
+                ` : ''}
               </div>
             </div>
           `).join('')}
         </div>
       ` : `<p class="text-muted" style="font-size:12.5px; margin-bottom:12px;">No lab tests ordered for this visit.</p>`}
-      ${v.status !== 'closed' && !isReceptionist ? `<a href="laboratory.html?newFor=${v.id}" class="btn btn-secondary btn-sm">${Icons.render('plus')} Order Lab Tests</a>` : ''}
+      ${v.status !== 'closed' && !isReceptionist ? `<a href="laboratory.html?newFor=${v.id}" class="btn btn-secondary btn-sm requires-saved-notes">${Icons.render('plus')} Order Lab Tests</a>` : ''}
     </div>
 
     <div class="detail-section">
@@ -338,15 +381,24 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
             <div class="timeline-item">
               <div class="timeline-dot"></div>
               <div class="timeline-body">
-                <div class="t">${rx.items.map(i => i.drug ? UI.escapeHtml(i.drug.name) : '?').join(', ')} ${UI.prescriptionStatusBadge(rx.status)}</div>
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                  <div class="t">${rx.items.map(i => i.drug ? UI.escapeHtml(i.drug.name) : '?').join(', ')} ${UI.prescriptionStatusBadge(rx.status)}</div>
+                  <div style="display:flex; align-items:center; gap:4px;">
+                    <button type="button" class="btn btn-ghost btn-sm" style="color:var(--color-primary); padding:2px 6px; font-size:11px; display:inline-flex; align-items:center; gap:3px;" title="Print Prescription" onclick="printPrescription('${rx.id}', event)">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Print
+                    </button>
+                    ${!isReceptionist ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--color-danger); padding:2px 6px; font-size:11px; display:inline-flex; align-items:center; gap:3px;" title="Delete Prescription" onclick="deletePrescriptionFromVisit('${rx.id}', '${v.id}')">${Icons.render('trash')} Delete</button>` : ''}
+                  </div>
+                </div>
                 <div class="d">${UI.formatDateTime(rx.prescribed_date)}</div>
               </div>
             </div>
           `).join('')}
         </div>
       ` : `<p class="text-muted" style="font-size:12.5px; margin-bottom:12px;">No prescriptions written for this visit.</p>`}
-      ${v.status !== 'closed' && !isReceptionist ? `<a href="pharmacy.html?newFor=${v.id}" class="btn btn-secondary btn-sm">${Icons.render('plus')} Write Prescription</a>` : ''}
+      ${v.status !== 'closed' && !isReceptionist ? `<a href="pharmacy.html?newFor=${v.id}" class="btn btn-secondary btn-sm requires-saved-notes">${Icons.render('plus')} Write Prescription</a>` : ''}
     </div>
+
 
     <div class="detail-section">
       <h4>Referrals &amp; sick leave (${referrals.length + sickLeaves.length})</h4>
@@ -356,7 +408,15 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
             <div class="timeline-item">
               <div class="timeline-dot"></div>
               <div class="timeline-body">
-                <div class="t">Referred to ${UI.escapeHtml(r.referred_to)}</div>
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                  <div class="t">Referred to ${UI.escapeHtml(r.referred_to)}</div>
+                  <div style="display:flex; align-items:center; gap:4px;">
+                    <button type="button" class="btn btn-ghost btn-sm" style="color:var(--color-primary); padding:2px 6px; font-size:11px; display:inline-flex; align-items:center; gap:3px;" title="Print Referral" onclick="printReferral('${r.id}', event)">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Print
+                    </button>
+                    ${!isReceptionist ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--color-danger); padding:2px 6px; font-size:11px; display:inline-flex; align-items:center; gap:3px;" title="Delete Referral" onclick="deleteReferralFromVisit('${r.id}', '${v.id}')">${Icons.render('trash')} Delete</button>` : ''}
+                  </div>
+                </div>
                 <div class="d">${UI.formatDateTime(r.referral_date)}</div>
               </div>
             </div>
@@ -365,7 +425,15 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
             <div class="timeline-item">
               <div class="timeline-dot"></div>
               <div class="timeline-body">
-                <div class="t">Sick leave: ${UI.formatDate(s.leave_start)} — ${UI.formatDate(s.leave_end)}</div>
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                  <div class="t">Sick leave: ${UI.formatDate(s.leave_start)} — ${UI.formatDate(s.leave_end)}</div>
+                  <div style="display:flex; align-items:center; gap:4px;">
+                    <button type="button" class="btn btn-ghost btn-sm" style="color:var(--color-primary); padding:2px 6px; font-size:11px; display:inline-flex; align-items:center; gap:3px;" title="Print Sick Leave" onclick="printSickLeave('${s.id}', event)">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Print
+                    </button>
+                    ${!isReceptionist ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--color-danger); padding:2px 6px; font-size:11px; display:inline-flex; align-items:center; gap:3px;" title="Delete Sick Leave" onclick="deleteSickLeaveFromVisit('${s.id}', '${v.id}')">${Icons.render('trash')} Delete</button>` : ''}
+                  </div>
+                </div>
                 <div class="d">Exam ${UI.formatDate(s.exam_date)}</div>
               </div>
             </div>
@@ -374,14 +442,24 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
       ` : `<p class="text-muted" style="font-size:12.5px; margin-bottom:12px;">No referrals or sick leave certificates for this visit.</p>`}
       ${v.status !== 'closed' && !isReceptionist ? `
         <div style="display:flex; gap:8px;">
-          <a href="referrals.html?newFor=${v.id}" class="btn btn-secondary btn-sm">${Icons.render('plus')} New Referral</a>
-          <a href="referrals.html?newFor=${v.id}&type=sickleave" class="btn btn-secondary btn-sm">${Icons.render('plus')} New Sick Leave</a>
+          <a href="referrals.html?newFor=${v.id}" class="btn btn-secondary btn-sm requires-saved-notes">${Icons.render('plus')} New Referral</a>
+          <a href="referrals.html?newFor=${v.id}&type=sickleave" class="btn btn-secondary btn-sm requires-saved-notes">${Icons.render('plus')} New Sick Leave</a>
         </div>
       ` : ''}
     </div>
 
+
     <div id="vd-block-notice"></div>
   `;
+
+  document.getElementById('visit-detail-body').querySelectorAll('.requires-saved-notes').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (isClinicalNotesDirty) {
+        e.preventDefault();
+        UI.toast('Please save your notes before continuing!', 'danger');
+      }
+    });
+  });
 
   const changePhysBtn = document.getElementById('vd-change-physician-btn');
   if (changePhysBtn) {
@@ -450,6 +528,13 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
   }
 
   if (canEditClinical) {
+    const markDirty = () => { isClinicalNotesDirty = true; };
+    document.getElementById('vd-notes').addEventListener('input', markDirty);
+    document.getElementById('vd-diagnosis').addEventListener('input', markDirty);
+    document.getElementById('vd-treatment').addEventListener('input', markDirty);
+    document.getElementById('vd-hr-note').addEventListener('input', markDirty);
+    document.getElementById('vd-disposition').addEventListener('change', markDirty);
+
     document.getElementById('vd-save-notes').addEventListener('click', async (e) => {
       const btn = e.currentTarget;
       btn.disabled = true;
@@ -458,9 +543,12 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
         await Api.visits.update(v.id, {
           examination_notes: document.getElementById('vd-notes').value,
           diagnosis: document.getElementById('vd-diagnosis').value,
+          treatment: document.getElementById('vd-treatment').value,
+          hr_note: document.getElementById('vd-hr-note').value,
           disposition: document.getElementById('vd-disposition').value || null,
         });
         UI.toast('Notes saved.');
+        isClinicalNotesDirty = false;
         loadVisits();
       } catch (e2) {
         UI.toast(UI.errorMessage(e2), 'danger');
@@ -474,21 +562,72 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
   // footer: state-machine action button
   const footer = document.getElementById('visit-detail-footer');
   const next = isReceptionist ? null : NEXT_STATUS[v.status];
+  const regId = v.patient ? v.patient.source_employee_registration_id : null;
+  const isCertEligible = !isReceptionist && (regId || v.visit_type === 'periodic_renewal' || (v.chief_complaint && (v.chief_complaint.toLowerCase().includes('medical examination') || v.chief_complaint.toLowerCase().includes('renewal'))));
+
+  const certBtnHtml = isCertEligible ? `<button class="btn btn-secondary" id="vd-record-cert-btn" style="border-color:var(--color-primary); color:var(--color-primary);">${Icons.render('filecheck')} Record Certificate</button>` : '';
+
+  const deleteBtnHtml = `<button type="button" class="btn btn-danger" id="vd-delete-btn" style="margin-right:auto; background-color:#dc3545; color:white;">${Icons.render('trash')} Delete Visit</button>`;
+
   if (!next) {
     const note = v.status === 'closed' ? 'This visit is closed.' : (isReceptionist ? 'Clinical status is managed by the attending physician.' : '');
-    footer.innerHTML = `<span class="footer-note">${note}</span><button class="btn btn-secondary" id="vd-close-modal">Close</button>`;
+    footer.innerHTML = `
+      ${deleteBtnHtml}
+      <span class="footer-note">${note}</span>
+      ${certBtnHtml}
+      <button class="btn btn-secondary" id="vd-close-modal">Close</button>
+    `;
   } else {
     footer.innerHTML = `
+      ${deleteBtnHtml}
       <button class="btn btn-secondary" id="vd-close-modal">Close</button>
+      ${certBtnHtml}
       <button class="btn btn-primary" id="vd-advance">${NEXT_STATUS_LABEL[next]}</button>
     `;
   }
   document.getElementById('vd-close-modal').addEventListener('click', closeVisitDetail);
 
+  const deleteBtn = document.getElementById('vd-delete-btn');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', () => deleteVisit(v.id, v.patient ? v.patient.full_name : 'Patient'));
+  }
+
+  const recordCertBtn = document.getElementById('vd-record-cert-btn');
+  if (recordCertBtn) {
+    recordCertBtn.addEventListener('click', async () => {
+      const payload = {
+        hr_note: document.getElementById('vd-hr-note').value,
+        treatment: document.getElementById('vd-treatment').value,
+        examination_notes: document.getElementById('vd-notes').value
+      };
+      if (document.getElementById('vd-diagnosis')) {
+        const diag = document.getElementById('vd-diagnosis').value.trim();
+        if (diag) payload.diagnosis = diag;
+      }
+      try {
+        await Api.visits.update(v.id, payload);
+      } catch (e) {}
+
+      UI.toast('Opening Medical Certification form…');
+      setTimeout(() => {
+        const query = regId ? `regId=${regId}&visitId=${v.id}` : `visitId=${v.id}`;
+        window.location.href = `certifications.html?${query}`;
+      }, 300);
+    });
+  }
+
   const advanceBtn = document.getElementById('vd-advance');
   if (advanceBtn) {
     advanceBtn.addEventListener('click', async () => {
-      const payload = { status: next };
+      if (isClinicalNotesDirty) {
+        UI.toast('Please save your notes before continuing!', 'danger');
+        return;
+      }
+      const payload = { 
+        status: next,
+        hr_note: document.getElementById('vd-hr-note').value,
+        treatment: document.getElementById('vd-treatment').value
+      };
       if (next === 'diagnosed') {
         const diagnosisVal = document.getElementById('vd-diagnosis').value.trim();
         if (!diagnosisVal) {
@@ -514,6 +653,7 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
       try {
         const updated = await Api.visits.update(v.id, payload);
         UI.toast(`Visit moved to "${updated.status}".`);
+
         const [full, admissions, labOrders, prescriptions, referrals, sickLeaves, vitals] = await Promise.all([
           Api.visits.get(v.id),
           Api.admissions.list({ visit_id: v.id }),
@@ -536,6 +676,110 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
   }
 }
 
+async function deleteVisit(id, patientName = 'this visit') {
+  if (!confirm(`Are you sure you want to delete the clinical visit for ${patientName}? All associated vitals, lab orders, prescriptions, and notes for this visit will be permanently removed.`)) {
+    return;
+  }
+  try {
+    await Api.visits.delete(id);
+    UI.toast('Visit deleted successfully.');
+    closeVisitDetail();
+    await loadVisits();
+  } catch (e) {
+    UI.toast(UI.errorMessage(e), 'danger');
+  }
+}
+
+window.deleteLabOrderFromVisit = async function(orderId, visitId) {
+  if (!confirm('Are you sure you want to delete this lab order? It will be removed from this visit and the laboratory queue.')) return;
+  try {
+    await Api.labOrders.delete(orderId);
+    UI.toast('Lab order deleted.');
+    await openVisitDetail(visitId);
+    await loadVisits();
+  } catch (err) {
+    UI.toast(UI.errorMessage(err), 'danger');
+  }
+};
+
+window.deletePrescriptionFromVisit = async function(rxId, visitId) {
+  if (!confirm('Are you sure you want to delete this prescription? Any dispensed quantities will be restored to pharmacy inventory and it will be removed from this visit.')) return;
+  try {
+    await Api.prescriptions.delete(rxId);
+    UI.toast('Prescription deleted.');
+    await openVisitDetail(visitId);
+    await loadVisits();
+  } catch (err) {
+    UI.toast(UI.errorMessage(err), 'danger');
+  }
+};
+
+window.deleteReferralFromVisit = async function(refId, visitId) {
+  if (!confirm('Are you sure you want to delete this referral? It will be removed from this visit.')) return;
+  try {
+    await Api.referrals.delete(refId);
+    UI.toast('Referral deleted.');
+    await openVisitDetail(visitId);
+    await loadVisits();
+  } catch (err) {
+    UI.toast(UI.errorMessage(err), 'danger');
+  }
+};
+
+window.deleteSickLeaveFromVisit = async function(slId, visitId) {
+  if (!confirm('Are you sure you want to delete this sick leave certificate? It will be removed from this visit and HR portal records.')) return;
+  try {
+    await Api.sickLeaves.delete(slId);
+    UI.toast('Sick leave certificate deleted.');
+    await openVisitDetail(visitId);
+    await loadVisits();
+  } catch (err) {
+    UI.toast(UI.errorMessage(err), 'danger');
+  }
+};
+
+window.printPrescription = async function(id, event) {
+  if (event) event.stopPropagation();
+  try {
+    const rx = await Api.prescriptions.get(id);
+    if (typeof PrintDoc !== 'undefined') {
+      PrintDoc.prescription(rx);
+    } else {
+      window.print();
+    }
+  } catch (e) {
+    UI.toast(UI.errorMessage(e), 'danger');
+  }
+};
+
+window.printReferral = async function(id, event) {
+  if (event) event.stopPropagation();
+  try {
+    const r = await Api.referrals.get(id);
+    if (typeof PrintDoc !== 'undefined') {
+      PrintDoc.referral(r);
+    } else {
+      window.print();
+    }
+  } catch (e) {
+    UI.toast(UI.errorMessage(e), 'danger');
+  }
+};
+
+window.printSickLeave = async function(id, event) {
+  if (event) event.stopPropagation();
+  try {
+    const s = await Api.sickLeaves.get(id);
+    if (typeof PrintDoc !== 'undefined') {
+      PrintDoc.sickLeave(s);
+    } else {
+      window.print();
+    }
+  } catch (e) {
+    UI.toast(UI.errorMessage(e), 'danger');
+  }
+};
+
 function closeVisitDetail() {
   document.getElementById('visit-detail-backdrop').classList.remove('visible');
 }
@@ -555,5 +799,12 @@ async function init() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('open')) openVisitDetail(params.get('open'));
   if (params.get('newFor')) openVisitForm(params.get('newFor'));
+
+  setInterval(() => {
+    const activeBackdrop = document.querySelector('.modal-backdrop.visible');
+    if (!activeBackdrop) {
+      loadVisits();
+    }
+  }, 10000);
 }
 init();

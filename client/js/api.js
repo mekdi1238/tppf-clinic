@@ -96,6 +96,10 @@ function buildSeed() {
     { id: 'test_rbs', code: 'RBS', panel: 'Chemistry', display_name: 'Random Blood Sugar' },
     { id: 'test_fbs', code: 'FBS', panel: 'Chemistry', display_name: 'Fasting Blood Sugar' },
     { id: 'test_crea', code: 'CREA', panel: 'Chemistry', display_name: 'Creatinine' },
+    { id: 'test_hba1c', code: 'HBA1C', panel: 'Chemistry', display_name: 'HbA1c (Glycated Hemoglobin)', normal_range: '5.7 - 6.4%' },
+    { id: 'test_so', code: 'SO', panel: 'Hematology', display_name: "SO (Salmonella 'O' Antigen)" },
+    { id: 'test_sh', code: 'SH', panel: 'Hematology', display_name: "SH (Salmonella 'H' Antigen)" },
+    { id: 'test_ox19', code: 'Ox19', panel: 'Hematology', display_name: 'Ox19 (Proteus OX19 Antigen)' },
     { id: 'test_hbsag', code: 'HBSAG', panel: 'Serology', display_name: 'Hepatitis B Surface Antigen' },
     { id: 'test_vdrl', code: 'VDRL', panel: 'Serology', display_name: 'Syphilis Screening (VDRL)' },
     { id: 'test_hiv', code: 'HIV', panel: 'Serology', display_name: 'HIV Antibody Test' },
@@ -786,7 +790,17 @@ async function mockRequest(method, path, body) {
       saveDb(db);
       return item;
     }
+    if (method === 'DELETE' && seg.length === 2) {
+      const idx = db.lab_orders.findIndex(x => String(x.id) === String(seg[1]));
+      if (idx === -1) { const err = new Error('Lab order not found.'); err.status = 404; throw err; }
+      db.lab_orders.splice(idx, 1);
+      db.lab_order_items = db.lab_order_items.filter(i => String(i.lab_order_id) !== String(seg[1]));
+      saveDb(db);
+      return { success: true, id: seg[1] };
+    }
   }
+
+
 
   function embedItemsForPrescription(rx) {
     const items = db.prescription_items.filter(i => i.prescription_id === rx.id).map(i => {
@@ -924,7 +938,30 @@ async function mockRequest(method, path, body) {
       saveDb(db);
       return embedItemsForPrescription(rx);
     }
+    if (method === 'DELETE' && seg.length === 2) {
+      const rxId = seg[1];
+      const idx = db.prescriptions.findIndex(x => String(x.id) === String(rxId));
+      if (idx === -1) { const err = new Error('Prescription not found.'); err.status = 404; throw err; }
+      
+      // Restore stock
+      const items = db.prescription_items.filter(i => String(i.prescription_id) === String(rxId));
+      items.forEach(it => {
+        const dispensed = db.dispensing_records.filter(d => String(d.prescription_item_id) === String(it.id));
+        const totalDisp = dispensed.reduce((sum, d) => sum + d.quantity_dispensed, 0);
+        if (totalDisp > 0) {
+          const stock = db.drug_stock.find(s => String(s.drug_id) === String(it.drug_id));
+          if (stock) stock.quantity_on_hand += totalDisp;
+        }
+        db.dispensing_records = db.dispensing_records.filter(d => String(d.prescription_item_id) !== String(it.id));
+      });
+
+      db.prescription_items = db.prescription_items.filter(i => String(i.prescription_id) !== String(rxId));
+      db.prescriptions.splice(idx, 1);
+      saveDb(db);
+      return { success: true, id: rxId };
+    }
   }
+
 
   // /referrals
   if (seg[0] === 'referrals') {
@@ -961,6 +998,13 @@ async function mockRequest(method, path, body) {
       db.referrals.unshift(referral);
       saveDb(db);
       return referral;
+    }
+    if (method === 'DELETE' && seg.length === 2) {
+      const idx = db.referrals.findIndex(x => String(x.id) === String(seg[1]));
+      if (idx === -1) { const err = new Error('Referral not found.'); err.status = 404; throw err; }
+      db.referrals.splice(idx, 1);
+      saveDb(db);
+      return { success: true, id: seg[1] };
     }
   }
 
@@ -1004,7 +1048,15 @@ async function mockRequest(method, path, body) {
       saveDb(db);
       return sickLeave;
     }
+    if (method === 'DELETE' && seg.length === 2) {
+      const idx = db.sick_leaves.findIndex(x => String(x.id) === String(seg[1]));
+      if (idx === -1) { const err = new Error('Sick leave not found.'); err.status = 404; throw err; }
+      db.sick_leaves.splice(idx, 1);
+      saveDb(db);
+      return { success: true, id: seg[1] };
+    }
   }
+
 
   // /roles
   if (seg[0] === 'roles' && method === 'GET') {
@@ -1118,14 +1170,45 @@ async function mockRequest(method, path, body) {
 
   // /backups
   if (seg[0] === 'backups') {
+    if (method === 'GET' && seg[1] === 'schedule') {
+      return db.backup_schedule || { enabled: false, frequency: 'daily', time_of_day: '02:00', retention_count: 14 };
+    }
+    if (method === 'PUT' && seg[1] === 'schedule') {
+      db.backup_schedule = { ...(db.backup_schedule || {}), ...body };
+      saveDb(db);
+      return db.backup_schedule;
+    }
     if (method === 'GET') {
       return [...db.backups].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
+    if (method === 'POST' && seg[1] === 'import') {
+      const backup = {
+        id: uid('bkp'),
+        filename: body.filename || `imported_${Date.now()}.sql`,
+        file_size: body.sql ? body.sql.length : 1500000,
+        notes: body.label || 'Imported Backup',
+        created_at: nowIso(),
+      };
+      db.backups.unshift(backup);
+      saveDb(db);
+      return {
+        ok: true,
+        message: body.restoreImmediately
+          ? `Database imported and successfully restored from ${backup.filename}`
+          : `Backup file ${backup.filename} imported successfully`,
+        backup,
+        restored: Boolean(body.restoreImmediately),
+      };
+    }
+    if (method === 'POST' && seg.length === 3 && seg[2] === 'restore') {
+      return { ok: true, message: `Database successfully restored from backup` };
     }
     if (method === 'POST') {
       const backup = {
         id: uid('bkp'),
-        label: body.label || `Manual backup`,
-        size_bytes: Math.floor(400000 + Math.random() * 2200000),
+        filename: `manual_backup_${Date.now()}.sql`,
+        notes: body.label || `Manual backup`,
+        file_size: Math.floor(400000 + Math.random() * 2200000),
         created_at: nowIso(),
         created_by: body.created_by || null,
       };
@@ -1192,6 +1275,7 @@ const Api = {
     create: (data) => apiRequest('POST', '/patients', data),
     update: (id, data) => apiRequest('PUT', `/patients/${id}`, data),
     delete: (id) => apiRequest('DELETE', `/patients/${id}`),
+    ensureRegistration: (id) => apiRequest('POST', `/patients/${id}/ensure-registration`),
     import: (records, options = {}) => apiRequest('POST', '/patients/import', { records, ...options }),
   },
   visits: {
@@ -1199,6 +1283,7 @@ const Api = {
     get: (id) => apiRequest('GET', `/visits/${id}`),
     create: (data) => apiRequest('POST', '/visits', data),
     update: (id, data) => apiRequest('PUT', `/visits/${id}`, data),
+    delete: (id) => apiRequest('DELETE', `/visits/${id}`),
   },
   vitals: {
     list: (visitId) => apiRequest('GET', `/visits/${visitId}/vitals`),
@@ -1209,14 +1294,16 @@ const Api = {
     get: (id) => apiRequest('GET', `/registrations/${id}`),
     create: (data) => apiRequest('POST', '/registrations', data),
     update: (id, data) => apiRequest('PUT', `/registrations/${id}`, data),
-    acceptAsStaff: (id, data) => apiRequest('POST', `/registrations/${id}/accept-as-staff`, data),
     delete: (id) => apiRequest('DELETE', `/registrations/${id}`),
+    acceptAsStaff: (id, data) => apiRequest('POST', `/registrations/${id}/accept-as-staff`, data),
+    createVisit: (id, data = {}) => apiRequest('POST', `/registrations/${id}/create-visit`, data),
     import: (records, options = {}) => apiRequest('POST', '/registrations/import', { records, ...options }),
   },
   certifications: {
     list: (params = {}) => apiRequest('GET', `/certifications?${new URLSearchParams(params)}`),
     get: (id) => apiRequest('GET', `/certifications/${id}`),
     create: (data) => apiRequest('POST', '/certifications', data),
+    update: (id, data) => apiRequest('PUT', `/certifications/${id}`, data),
   },
   admissions: {
     list: (params = {}) => apiRequest('GET', `/admissions?${new URLSearchParams(params)}`),
@@ -1233,40 +1320,52 @@ const Api = {
     get: (id) => apiRequest('GET', `/lab-orders/${id}`),
     create: (data) => apiRequest('POST', '/lab-orders', data),
     updateStatus: (id, status) => apiRequest('PUT', `/lab-orders/${id}`, { status }),
+    updateNote: (id, technician_note) => apiRequest('PUT', `/lab-orders/${id}`, { technician_note }),
     updateItem: (orderId, itemId, result_value) => apiRequest('PUT', `/lab-orders/${orderId}/items/${itemId}`, { result_value }),
+    delete: (id) => apiRequest('DELETE', `/lab-orders/${id}`),
   },
   drugs: {
     list: () => apiRequest('GET', '/drugs'),
     create: (data) => apiRequest('POST', '/drugs', data),
-    adjustStock: (drugId, delta) => apiRequest('PUT', `/drug-stock/${drugId}`, { delta }),
+    update: (id, data) => apiRequest('PUT', `/drugs/${id}`, data),
+    adjustStock: (drugId, delta, expiry_date) => apiRequest('PUT', `/drug-stock/${drugId}`, { delta, expiry_date }),
+    delete: (id) => apiRequest('DELETE', `/drugs/${id}`),
+    import: (records, options = {}) => apiRequest('POST', '/drugs/import', { records, ...options }),
   },
   prescriptions: {
     list: (params = {}) => apiRequest('GET', `/prescriptions?${new URLSearchParams(params)}`),
     get: (id) => apiRequest('GET', `/prescriptions/${id}`),
     create: (data) => apiRequest('POST', '/prescriptions', data),
     dispense: (id, item_id, quantity) => apiRequest('POST', `/prescriptions/${id}/dispense`, { item_id, quantity }),
+    delete: (id) => apiRequest('DELETE', `/prescriptions/${id}`),
   },
+
   referrals: {
     list: (params = {}) => apiRequest('GET', `/referrals?${new URLSearchParams(params)}`),
     get: (id) => apiRequest('GET', `/referrals/${id}`),
     create: (data) => apiRequest('POST', '/referrals', data),
+    delete: (id) => apiRequest('DELETE', `/referrals/${id}`),
   },
   sickLeaves: {
     list: (params = {}) => apiRequest('GET', `/sick-leaves?${new URLSearchParams(params)}`),
     get: (id) => apiRequest('GET', `/sick-leaves/${id}`),
     create: (data) => apiRequest('POST', '/sick-leaves', data),
+    delete: (id) => apiRequest('DELETE', `/sick-leaves/${id}`),
   },
+
   profile: {
     get: () => apiRequest('GET', '/profile'),
     update: (data) => apiRequest('PUT', '/profile', data),
   },
   roles: {
     list: () => apiRequest('GET', '/roles'),
+    update: (id, data) => apiRequest('PUT', `/roles/${id}`, data),
   },
   users: {
     list: (params = {}) => apiRequest('GET', `/users?${new URLSearchParams(params)}`),
     create: (data) => apiRequest('POST', '/users', data),
     update: (id, data) => apiRequest('PUT', `/users/${id}`, data),
+    delete: (id) => apiRequest('DELETE', `/users/${id}`),
     resetPassword: (id, password) => apiRequest('POST', `/users/${id}/reset-password`, { password }),
     changePassword: (id, current_password, new_password) => apiRequest('POST', `/users/${id}/change-password`, { current_password, new_password }),
   },
@@ -1274,13 +1373,51 @@ const Api = {
     get: () => apiRequest('GET', '/settings'),
     update: (data) => apiRequest('PUT', '/settings', data),
   },
+  departments: {
+    list: () => apiRequest('GET', '/departments'),
+    get: (id) => apiRequest('GET', `/departments/${id}`),
+    create: (data) => apiRequest('POST', '/departments', data),
+    update: (id, data) => apiRequest('PUT', `/departments/${id}`, data),
+    delete: (id, data = {}) => apiRequest('DELETE', `/departments/${id}`, data),
+    addPosition: (deptId, data) => apiRequest('POST', `/departments/${deptId}/positions`, data),
+    updatePosition: (deptId, posId, data) => apiRequest('PUT', `/departments/${deptId}/positions/${posId}`, data),
+    deletePosition: (deptId, posId) => apiRequest('DELETE', `/departments/${deptId}/positions/${posId}`),
+  },
   backups: {
     list: () => apiRequest('GET', '/backups'),
     create: (label) => apiRequest('POST', '/backups', { label }),
     remove: (id) => apiRequest('DELETE', `/backups/${id}`),
+    restore: (id) => apiRequest('POST', `/backups/${id}/restore`),
+    import: (data) => apiRequest('POST', '/backups/import', data),
+    getSchedule: () => apiRequest('GET', '/backups/schedule'),
+    updateSchedule: (data) => apiRequest('PUT', '/backups/schedule', data),
   },
   staff: {
     list: (params = {}) => apiRequest('GET', `/staff?${new URLSearchParams(params)}`),
     get: (id) => apiRequest('GET', `/staff/${id}`),
+    getMedicalRecord: (id) => apiRequest('GET', `/staff/${id}/medical-record`),
   },
+  checkups: {
+    due: (params = {}) => apiRequest('GET', `/checkups/due?${new URLSearchParams(params)}`),
+    all: (params = {}) => apiRequest('GET', `/checkups/all?${new URLSearchParams(params)}`),
+    dispatchRenewal: (data) => apiRequest('POST', '/checkups/dispatch-renewal', data),
+    approveRenewal: (data) => apiRequest('POST', '/checkups/approve-renewal', data),
+    editExamDate: (data) => apiRequest('PUT', '/checkups/edit-exam-date', data),
+  },
+  auditLogs: {
+    list: (params = {}) => apiRequest('GET', `/audit-logs?${new URLSearchParams(params)}`),
+    get: (id) => apiRequest('GET', `/audit-logs/${id}`),
+    filters: () => apiRequest('GET', '/audit-logs/filters'),
+    stats: () => apiRequest('GET', '/audit-logs/stats'),
+  },
+  get: (path) => apiRequest('GET', path),
+  post: (path, data) => apiRequest('POST', path, data),
+  put: (path, data) => apiRequest('PUT', path, data),
+  delete: (path) => apiRequest('DELETE', path),
 };
+
+const API = Api;
+if (typeof window !== 'undefined') {
+  window.Api = Api;
+  window.API = Api;
+}

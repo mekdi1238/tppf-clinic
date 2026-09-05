@@ -26,6 +26,9 @@
           <button type="button" class="btn btn-ghost" id="tab-btn-dispatch" style="font-weight:700; border-bottom:2px solid var(--color-primary); border-radius:0;">
             <span id="dispatch-tab-icon"></span> Dispatch Staff Checkup
           </button>
+          <button type="button" class="btn btn-ghost" id="tab-btn-renewals" style="font-weight:600; color:var(--color-text-muted); border-radius:0;">
+            <span id="renewals-tab-icon"></span> 6-Month Fitness Renewals
+          </button>
           <button type="button" class="btn btn-ghost" id="tab-btn-sick-leaves" style="font-weight:600; color:var(--color-text-muted); border-radius:0;">
             <span id="sick-tab-icon"></span> Department Sick Leaves
           </button>
@@ -41,18 +44,58 @@
               </div>
               <select class="select-filter" id="dept-filter-select">
                 <option value="all">All departments</option>
-                <option value="Medical">Medical</option>
-                <option value="Finance">Finance</option>
+                <option value="Manager">Manager</option>
                 <option value="Human Resource Management">Human Resource Management</option>
                 <option value="Planning and Budget Service">Planning and Budget Service</option>
-                <option value="Product Quality Control Service">Product Quality Control Service</option>
-                <option value="Production and Technic">Production and Technic</option>
+                <option value="Production Quality Control Service">Production Quality Control Service</option>
+                <option value="Production">Production</option>
+                <option value="Technic">Technic</option>
                 <option value="Property Management">Property Management</option>
+                <option value="Finance">Finance</option>
+              </select>
+              <select class="select-filter" id="staff-fitness-filter-select">
+                <option value="all">All fitness statuses</option>
+                <option value="fit">Medical Fit</option>
+                <option value="unfit">Medical Unfit</option>
+                <option value="unknown">Unknown / Not Examined</option>
               </select>
             </div>
+            <button type="button" class="btn btn-secondary" id="staff-reset-btn" title="Reset filters">Reset</button>
           </div>
 
           <div id="staff-table-region"></div>
+        </div>
+
+        <!-- Section 3: 6-Month Fitness Renewals -->
+        <div id="section-renewals" style="display:none;">
+          <div class="page-toolbar">
+            <div class="toolbar-filters">
+              <div class="search-box">
+                <span id="renewals-search-icon-slot"></span>
+                <input type="text" id="renewals-search-input" placeholder="Search by name, code, or position…" />
+              </div>
+              <select class="select-filter" id="renewals-dept-filter-select">
+                <option value="all">All departments</option>
+                <option value="Manager">Manager</option>
+                <option value="Human Resource Management">Human Resource Management</option>
+                <option value="Planning and Budget Service">Planning and Budget Service</option>
+                <option value="Production Quality Control Service">Production Quality Control Service</option>
+                <option value="Production">Production</option>
+                <option value="Technic">Technic</option>
+                <option value="Property Management">Property Management</option>
+                <option value="Finance">Finance</option>
+              </select>
+              <select class="select-filter" id="renewals-status-filter-select">
+                <option value="all">All renewal statuses</option>
+                <option value="active_fit">Active Fit (Valid)</option>
+                <option value="due_soon">Notice: Renewal Due Soon (≤ 7 days)</option>
+                <option value="overdue">Expired (Overdue)</option>
+                <option value="no_certificate">No Certificate</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn-secondary" id="renewals-reset-btn" title="Reset filters">Reset</button>
+          </div>
+          <div id="renewals-table-region"></div>
         </div>
 
         <!-- Section 2: Department Sick Leaves -->
@@ -63,7 +106,19 @@
                 <span id="sick-search-icon-slot"></span>
                 <input type="text" id="sick-search-input" placeholder="Search sick leaves by employee name or code…" />
               </div>
+              <select class="select-filter" id="sick-dept-filter-select">
+                <option value="all">All departments</option>
+                <option value="Manager">Manager</option>
+                <option value="Human Resource Management">Human Resource Management</option>
+                <option value="Planning and Budget Service">Planning and Budget Service</option>
+                <option value="Production Quality Control Service">Production Quality Control Service</option>
+                <option value="Production">Production</option>
+                <option value="Technic">Technic</option>
+                <option value="Property Management">Property Management</option>
+                <option value="Finance">Finance</option>
+              </select>
             </div>
+
           </div>
 
           <div id="sick-leaves-table-region"></div>
@@ -129,18 +184,40 @@
       </div>
       <div class="modal-body" id="sick-cert-modal-body"></div>
       <div class="modal-footer">
+        <button type="button" class="btn btn-danger btn-sm" id="sick-cert-modal-delete" style="margin-right:auto; display:inline-flex; align-items:center; gap:4px;">Delete Certificate</button>
         <button type="button" class="btn btn-secondary" id="sick-cert-modal-cancel">Close</button>
         <button type="button" class="btn btn-primary" onclick="window.print()">Print Certificate</button>
       </div>
     </div>
   </div>
 
+
+  <!-- Staff Medical File Modal (Comprehensive HR View) -->
+  <div class="modal-backdrop" id="staff-record-modal-backdrop">
+    <div class="modal modal-wide" style="max-width: 720px;">
+      <div class="modal-header">
+        <div>
+          <h2>Staff Medical File</h2>
+          <p>Comprehensive medical status and physician advice.</p>
+        </div>
+        <button class="icon-btn" id="staff-record-modal-close"></button>
+      </div>
+      <div class="modal-body" id="staff-record-modal-body"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="staff-record-modal-cancel">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
+  
   <script src="js/auth.js"></script>
+  <script src="js/permissions.js"></script>
   <script src="js/roles.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/shell.js"></script>
+  <script src="js/printDocument.js"></script>
   <script src="js/dept-hr.js"></script>
 </body>
 </html>

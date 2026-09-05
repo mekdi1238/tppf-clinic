@@ -20,6 +20,13 @@ document.getElementById('referral-detail-close').innerHTML = Icons.render('close
 document.getElementById('sl-modal-close').innerHTML = Icons.render('close');
 document.getElementById('sl-detail-close').innerHTML = Icons.render('close');
 
+const newRefBtn = document.getElementById('new-referral-btn');
+const newSlBtn = document.getElementById('new-sl-btn');
+if (typeof Permissions !== 'undefined') {
+  if (newRefBtn) newRefBtn.style.display = Permissions.has('referrals.create') ? 'inline-flex' : 'none';
+  if (newSlBtn) newSlBtn.style.display = Permissions.has('sick_leaves.create') || Permissions.has('referrals.create') ? 'inline-flex' : 'none';
+}
+
 let physiciansCache = [];
 let visitsCache = [];
 let eligibleVisits = [];
@@ -127,8 +134,15 @@ function renderReferralsTable(list) {
               </td>
               <td class="cell-muted">${UI.escapeHtml(physicianName(r.physician_id))}</td>
               <td class="cell-muted">${UI.escapeHtml(r.referred_to)}</td>
-              <td class="cell-muted">${UI.formatDateTime(r.referral_date)}</td>
-              <td><button class="icon-btn" title="View" onclick="openReferralDetail('${r.id}')">${Icons.render('eye')}</button></td>
+              <td>
+                <div style="display:flex; align-items:center; gap:4px;">
+                  <button class="icon-btn" title="Print Referral Form" onclick="printReferral('${r.id}', event)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                  </button>
+                  <button class="icon-btn" title="View" onclick="openReferralDetail('${r.id}')">${Icons.render('eye')}</button>
+                  <button class="icon-btn icon-btn-danger" title="Delete Referral" onclick="deleteReferral('${r.id}', event)">${Icons.render('trash')}</button>
+                </div>
+              </td>
             </tr>
           `).join('')}
         </tbody>
@@ -137,9 +151,41 @@ function renderReferralsTable(list) {
   `;
 }
 
+const refToSelect = document.getElementById('rf-referred-to-select');
+const refToCustom = document.getElementById('rf-referred-to-custom');
+const refToHidden = document.getElementById('rf-referred-to');
+
+function syncReferredToHidden() {
+  if (!refToSelect) return;
+  const val = refToSelect.value;
+  if (val === 'Other') {
+    refToCustom.style.display = 'block';
+    refToHidden.value = refToCustom.value.trim();
+  } else {
+    refToCustom.style.display = 'none';
+    refToHidden.value = val;
+  }
+}
+
+if (refToSelect) {
+  refToSelect.addEventListener('change', () => {
+    syncReferredToHidden();
+    if (refToSelect.value === 'Other') refToCustom.focus();
+  });
+}
+if (refToCustom) {
+  refToCustom.addEventListener('input', syncReferredToHidden);
+}
+
 function openReferralForm(visitId = null) {
   if (!eligibleVisits.length) { UI.toast('No open visits are eligible for a referral.', 'danger'); return; }
   document.getElementById('referral-form').reset();
+  if (refToSelect) {
+    refToSelect.value = '';
+    refToCustom.value = '';
+    refToCustom.style.display = 'none';
+    refToHidden.value = '';
+  }
   if (visitId) {
     document.getElementById('rf-visit').value = visitId;
     document.getElementById('rf-visit').dispatchEvent(new Event('change'));
@@ -203,11 +249,53 @@ async function openReferralDetail(id) {
         ${r.note ? `<div class="detail-item" style="grid-column:1/-1;"><div class="k">Note</div><div class="v" style="font-weight:500;">${UI.escapeHtml(r.note)}</div></div>` : ''}
       </div>
     `;
+    const delBtn = document.getElementById('referral-detail-delete-btn');
+    if (delBtn) delBtn.onclick = () => deleteReferral(r.id);
+
+    const printBtn = document.getElementById('referral-detail-print-btn');
+    if (printBtn) {
+      printBtn.onclick = () => {
+        if (typeof PrintDoc !== 'undefined') {
+          PrintDoc.referral(r);
+        } else {
+          window.print();
+        }
+      };
+    }
+
     document.getElementById('referral-detail-backdrop').classList.add('visible');
   } catch (e) {
     UI.toast(UI.errorMessage(e), 'danger');
   }
 }
+
+window.printReferral = async function(id, event) {
+  if (event) event.stopPropagation();
+  try {
+    const r = await Api.referrals.get(id);
+    if (typeof PrintDoc !== 'undefined') {
+      PrintDoc.referral(r);
+    } else {
+      window.print();
+    }
+  } catch (e) {
+    UI.toast(UI.errorMessage(e), 'danger');
+  }
+};
+
+window.deleteReferral = async function(id, event) {
+  if (event) event.stopPropagation();
+  if (!confirm('Are you sure you want to delete this referral? It will also be removed from the patient visit record.')) return;
+  try {
+    await Api.referrals.delete(id);
+    UI.toast('Referral deleted successfully.');
+    closeReferralDetail();
+    loadReferrals();
+  } catch (err) {
+    UI.toast(UI.errorMessage(err), 'danger');
+  }
+};
+
 function closeReferralDetail() { document.getElementById('referral-detail-backdrop').classList.remove('visible'); }
 document.getElementById('referral-detail-close').addEventListener('click', closeReferralDetail);
 document.getElementById('referral-detail-close-btn').addEventListener('click', closeReferralDetail);
@@ -252,8 +340,16 @@ function renderSickLeavesTable(list) {
               </td>
               <td class="cell-muted">${UI.escapeHtml(physicianName(s.physician_id))}</td>
               <td class="cell-muted">${UI.formatDate(s.leave_start)} — ${UI.formatDate(s.leave_end)}</td>
-              <td class="cell-muted">${daysInclusive(s.leave_start, s.leave_end)}</td>
-              <td><button class="icon-btn" title="View" onclick="openSickLeaveDetail('${s.id}')">${Icons.render('eye')}</button></td>
+              <td class="cell-muted">${s.days || 1} day(s)</td>
+              <td>
+                <div style="display:flex; align-items:center; gap:4px;">
+                  <button class="icon-btn" title="Print Sick Leave Certificate" onclick="printSickLeave('${s.id}', event)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                  </button>
+                  <button class="icon-btn" title="View" onclick="openSickLeaveDetail('${s.id}')">${Icons.render('eye')}</button>
+                  <button class="icon-btn icon-btn-danger" title="Delete Sick Leave" onclick="deleteSickLeave('${s.id}', event)">${Icons.render('trash')}</button>
+                </div>
+              </td>
             </tr>
           `).join('')}
         </tbody>
@@ -331,11 +427,53 @@ async function openSickLeaveDetail(id) {
         <div class="detail-item" style="grid-column:1/-1;"><div class="k">Diagnosis</div><div class="v" style="font-weight:500;">${UI.escapeHtml(s.diagnosis) || '—'}</div></div>
       </div>
     `;
+    const delBtn = document.getElementById('sl-detail-delete-btn');
+    if (delBtn) delBtn.onclick = () => deleteSickLeave(s.id);
+
+    const printBtn = document.getElementById('sl-detail-print-btn');
+    if (printBtn) {
+      printBtn.onclick = () => {
+        if (typeof PrintDoc !== 'undefined') {
+          PrintDoc.sickLeave(s);
+        } else {
+          window.print();
+        }
+      };
+    }
+
     document.getElementById('sl-detail-backdrop').classList.add('visible');
   } catch (e) {
     UI.toast(UI.errorMessage(e), 'danger');
   }
 }
+
+window.printSickLeave = async function(id, event) {
+  if (event) event.stopPropagation();
+  try {
+    const s = await Api.sickLeaves.get(id);
+    if (typeof PrintDoc !== 'undefined') {
+      PrintDoc.sickLeave(s);
+    } else {
+      window.print();
+    }
+  } catch (e) {
+    UI.toast(UI.errorMessage(e), 'danger');
+  }
+};
+
+window.deleteSickLeave = async function(id, event) {
+  if (event) event.stopPropagation();
+  if (!confirm('Are you sure you want to delete this sick leave certificate? It will also be removed from the patient visit and HR portal staff records.')) return;
+  try {
+    await Api.sickLeaves.delete(id);
+    UI.toast('Sick leave certificate deleted successfully.');
+    closeSickLeaveDetail();
+    loadSickLeaves();
+  } catch (err) {
+    UI.toast(UI.errorMessage(err), 'danger');
+  }
+};
+
 function closeSickLeaveDetail() { document.getElementById('sl-detail-backdrop').classList.remove('visible'); }
 document.getElementById('sl-detail-close').addEventListener('click', closeSickLeaveDetail);
 document.getElementById('sl-detail-close-btn').addEventListener('click', closeSickLeaveDetail);

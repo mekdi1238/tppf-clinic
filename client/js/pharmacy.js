@@ -15,10 +15,20 @@ document.getElementById('search-icon-slot').innerHTML = Icons.render('search');
 document.getElementById('plus-icon-slot').innerHTML = Icons.render('plus');
 document.getElementById('stock-search-icon-slot').innerHTML = Icons.render('search');
 document.getElementById('drug-plus-icon-slot').innerHTML = Icons.render('plus');
+const importSlot = document.getElementById('import-icon-slot');
 document.getElementById('rx-modal-close').innerHTML = Icons.render('close');
 document.getElementById('rx-detail-close').innerHTML = Icons.render('close');
 document.getElementById('drug-modal-close').innerHTML = Icons.render('close');
 document.getElementById('restock-modal-close').innerHTML = Icons.render('close');
+
+const newRxBtn = document.getElementById('new-rx-btn');
+const newDrugBtn = document.getElementById('new-drug-btn');
+const importDrugsBtn = document.getElementById('import-drugs-btn');
+if (typeof Permissions !== 'undefined') {
+  if (newRxBtn) newRxBtn.style.display = Permissions.has('pharmacy.dispense') ? 'inline-flex' : 'none';
+  if (newDrugBtn) newDrugBtn.style.display = Permissions.has('pharmacy.manage_stock') ? 'inline-flex' : 'none';
+  if (importDrugsBtn) importDrugsBtn.style.display = Permissions.has('pharmacy.manage_stock') ? 'inline-flex' : 'none';
+}
 
 let physiciansCache = [];
 let visitsCache = [];
@@ -211,7 +221,15 @@ function renderRxTable(list) {
               <td class="cell-muted">${UI.formatDateTime(rx.prescribed_date)}</td>
               <td class="cell-muted">${rx.items.map(i => i.drug ? UI.escapeHtml(i.drug.name) : '?').join(', ')}</td>
               <td>${UI.prescriptionStatusBadge(rx.status)}</td>
-              <td><button class="icon-btn" title="View" onclick="openRxDetail('${rx.id}')">${Icons.render('eye')}</button></td>
+              <td>
+                <div style="display:flex; align-items:center; gap:4px;">
+                  <button class="icon-btn" title="Print Prescription" onclick="printPrescription('${rx.id}', event)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                  </button>
+                  <button class="icon-btn" title="View" onclick="openRxDetail('${rx.id}')">${Icons.render('eye')}</button>
+                  <button class="icon-btn icon-btn-danger" title="Delete Prescription" onclick="deletePrescription('${rx.id}', event)">${Icons.render('trash')}</button>
+                </div>
+              </td>
             </tr>
           `).join('')}
         </tbody>
@@ -219,6 +237,20 @@ function renderRxTable(list) {
     </div>
   `;
 }
+
+window.printPrescription = async function(id, event) {
+  if (event) event.stopPropagation();
+  try {
+    const rx = await Api.prescriptions.get(id);
+    if (typeof PrintDoc !== 'undefined') {
+      PrintDoc.prescription(rx);
+    } else {
+      window.print();
+    }
+  } catch (e) {
+    UI.toast(UI.errorMessage(e), 'danger');
+  }
+};
 
 // ---------- Prescription detail / dispense ----------
 async function openRxDetail(id) {
@@ -234,6 +266,22 @@ async function openRxDetail(id) {
 function renderRxDetail(rx) {
   document.getElementById('rxd-name').textContent = rx.patient_name;
   document.getElementById('rxd-sub').textContent = `${rx.patient_code} · prescribed ${UI.formatDateTime(rx.prescribed_date)} by ${UI.escapeHtml(physicianName(rx.physician_id))}`;
+
+  const delBtn = document.getElementById('rx-detail-delete-btn');
+  if (delBtn) {
+    delBtn.onclick = () => deletePrescription(rx.id);
+  }
+
+  const printBtn = document.getElementById('rx-detail-print-btn');
+  if (printBtn) {
+    printBtn.onclick = () => {
+      if (typeof PrintDoc !== 'undefined') {
+        PrintDoc.prescription(rx);
+      } else {
+        window.print();
+      }
+    };
+  }
 
   document.getElementById('rx-detail-body').innerHTML = `
     <div style="margin-bottom:14px;">${UI.prescriptionStatusBadge(rx.status)}</div>
@@ -289,6 +337,21 @@ function renderRxDetail(rx) {
   });
 }
 
+window.deletePrescription = async function(id, event) {
+  if (event) event.stopPropagation();
+  if (!confirm('Are you sure you want to delete this prescription? Any dispensed stock will be restored to pharmacy inventory and it will be removed from the patient visit record.')) return;
+  try {
+    await Api.prescriptions.delete(id);
+    UI.toast('Prescription deleted successfully.');
+    closeRxDetail();
+    loadRx();
+    loadStock();
+  } catch (err) {
+    UI.toast(UI.errorMessage(err), 'danger');
+  }
+};
+
+
 function closeRxDetail() { document.getElementById('rx-detail-backdrop').classList.remove('visible'); }
 document.getElementById('rx-detail-close').addEventListener('click', closeRxDetail);
 document.getElementById('rx-detail-close-btn').addEventListener('click', closeRxDetail);
@@ -302,7 +365,65 @@ async function loadStock() {
   try {
     drugsCache = await Api.drugs.list();
     const search = document.getElementById('stock-search-input').value.trim().toLowerCase();
-    const list = search ? drugsCache.filter(d => d.name.toLowerCase().includes(search)) : drugsCache;
+    const category = document.getElementById('stock-category-filter') ? document.getElementById('stock-category-filter').value : 'all';
+    const condition = document.getElementById('stock-condition-filter') ? document.getElementById('stock-condition-filter').value : 'all';
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const sixMonthsLater = new Date(today);
+    sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+
+    let list = drugsCache;
+
+    if (search) {
+      list = list.filter(d =>
+        (d.name && d.name.toLowerCase().includes(search)) ||
+        (d.drug_code && d.drug_code.toLowerCase().includes(search)) ||
+        (d.category && d.category.toLowerCase().includes(search)) ||
+        (d.batch_no && d.batch_no.toLowerCase().includes(search)) ||
+        (d.description && d.description.toLowerCase().includes(search))
+      );
+    }
+
+    if (category && category !== 'all') {
+      if (category === 'Other') {
+        const STANDARD_CATS = [
+          'Anti Acid drugs', 'Eye ointment', 'Skin ointment', 'Iv Fluid', 'Syringe',
+          'Anti Pain', 'Dressing materials', 'Disinfectant solution', 'Adhesive Plaster',
+          'Anti bacterial Drug', 'Cardiovascular Drug (CVS)', 'Anti diabetic',
+          'minerals', 'Anti protocol', 'Anti Inflammatory Drugs'
+        ];
+        list = list.filter(d => !STANDARD_CATS.includes(d.category));
+      } else {
+        list = list.filter(d => d.category === category);
+      }
+    }
+
+    if (condition === 'good') {
+      list = list.filter(d => d.expiry_date && new Date(d.expiry_date) > sixMonthsLater);
+    } else if (condition === 'expiring_soon') {
+      list = list.filter(d => d.expiry_date && new Date(d.expiry_date) >= today && new Date(d.expiry_date) <= sixMonthsLater);
+    } else if (condition === 'expired') {
+      list = list.filter(d => d.expiry_date && new Date(d.expiry_date) < today);
+    } else if (condition === 'low_stock') {
+      list = list.filter(d => {
+        const stock = d.stock || { quantity_on_hand: 0, reorder_threshold: 0 };
+        const q = Number(stock.quantity_on_hand);
+        const t = Number(stock.reorder_threshold);
+        return q > 0 && q <= t;
+      });
+    } else if (condition === 'out_of_stock') {
+      list = list.filter(d => {
+        const stock = d.stock || { quantity_on_hand: 0 };
+        return Number(stock.quantity_on_hand) === 0;
+      });
+    } else if (condition === 'overstock') {
+      list = list.filter(d => {
+        const stock = d.stock || {};
+        return stock.max_threshold !== null && stock.max_threshold !== undefined && Number(stock.quantity_on_hand) > Number(stock.max_threshold);
+      });
+    }
+
     renderStockTable(list);
   } catch (e) {
     UI.toast(UI.errorMessage(e), 'danger');
@@ -316,9 +437,12 @@ function renderStockTable(list) {
       <div class="table-wrap">
         <div class="empty-state">
           <div class="empty-icon">${Icons.render('pill')}</div>
-          <h3>No drugs found</h3>
-          <p>Add a drug to the formulary to get started.</p>
-          <button class="btn btn-primary" onclick="openDrugForm()">${Icons.render('plus')} Add Drug</button>
+          <h3>No drugs match the filter</h3>
+          <p>Try a different search, category, or condition filter, or add a new drug.</p>
+          <div style="display:flex; gap:10px; justify-content:center; margin-top:12px;">
+            <button class="btn btn-secondary" onclick="ImportModal.open('drugs', () => loadStock())">${Icons.render('upload')} Import Drugs</button>
+            <button class="btn btn-primary" onclick="openDrugForm()">${Icons.render('plus')} Add Drug</button>
+          </div>
         </div>
       </div>`;
     return;
@@ -326,51 +450,273 @@ function renderStockTable(list) {
   region.innerHTML = `
     <div class="table-wrap">
       <table class="data-table">
-        <thead><tr><th>Name</th><th>Unit</th><th>On hand</th><th>Reorder threshold</th><th>Status</th><th></th></tr></thead>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Item Name</th>
+            <th>Category</th>
+            <th>Unit / Measure</th>
+            <th>Batch No</th>
+            <th>Min (Thresh)</th>
+            <th>Maximum</th>
+            <th>Quantity</th>
+            <th>Expiry Date (YYYY-MM-DD)</th>
+            <th>Stock Status</th>
+            <th>Expiry Status</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
         <tbody>
-          ${list.map(d => `
-            <tr>
-              <td class="cell-primary">${UI.escapeHtml(d.name)}</td>
-              <td class="cell-muted">${UI.escapeHtml(d.unit)}</td>
-              <td class="cell-muted">${d.stock.quantity_on_hand}</td>
-              <td class="cell-muted">${d.stock.reorder_threshold}</td>
-              <td>${UI.stockBadge(d.stock)}</td>
-              <td><button class="btn btn-secondary btn-sm" onclick="openRestockForm('${d.id}')">Adjust</button></td>
-            </tr>
-          `).join('')}
+          ${list.map(d => {
+            const stock = d.stock || { quantity_on_hand: 0, reorder_threshold: 0, max_threshold: null };
+            return `
+              <tr>
+                <td class="cell-code" style="font-weight:700; color:var(--color-primary); cursor:pointer;" onclick="openEditDrugFormById('${d.id}')">
+                  ${UI.escapeHtml(d.drug_code || '—')}
+                </td>
+                <td class="cell-primary" style="cursor:pointer;" onclick="openEditDrugFormById('${d.id}')">
+                  <div style="font-weight:600;">${UI.escapeHtml(d.name)}</div>
+                  ${d.description ? `<div style="font-size:11.5px; color:var(--color-text-muted); font-weight:normal; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${UI.escapeHtml(d.description)}</div>` : ''}
+                </td>
+                <td>
+                  ${d.category
+                    ? `<span class="badge badge-neutral" style="font-size:11.5px; font-weight:600; background:rgba(0,102,204,0.08); color:var(--color-primary);">${UI.escapeHtml(d.category)}</span>`
+                    : '<span class="text-muted">—</span>'}
+                </td>
+                <td class="cell-muted" style="font-size:12.5px;">${UI.escapeHtml(d.unit || '—')}</td>
+                <td class="cell-muted" style="font-family:monospace; font-size:12px; font-weight:600;">${UI.escapeHtml(d.batch_no || '—')}</td>
+                <td class="cell-muted" style="font-weight:600;">${stock.reorder_threshold !== null && stock.reorder_threshold !== undefined ? stock.reorder_threshold : 0}</td>
+                <td class="cell-muted" style="font-weight:600;">${stock.max_threshold !== null && stock.max_threshold !== undefined ? stock.max_threshold : '—'}</td>
+                <td style="font-weight:700; font-size:14px; color:var(--color-text);">${stock.quantity_on_hand}</td>
+                <td class="cell-muted" style="font-weight:600;">${d.expiry_date ? UI.formatDate(d.expiry_date) : '<span class="text-muted">Not set</span>'}</td>
+                <td>${UI.stockBadge(stock)}</td>
+                <td>${UI.drugExpiryBadge(d.expiry_date)}</td>
+                <td>
+                  <div style="display:flex; gap:6px; justify-content:flex-end;">
+                    <button class="btn btn-secondary btn-sm" onclick="openEditDrugFormById('${d.id}')" title="Edit Drug Details">Edit</button>
+                    <button class="btn btn-secondary btn-sm" onclick="openRestockForm('${d.id}')" title="Quick Quantity Adjustment">Adjust</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteDrug('${d.id}', '${UI.escapeHtml(d.name)}')" style="background-color:#dc3545; color:white;">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('')}
         </tbody>
       </table>
     </div>
   `;
 }
 
+async function deleteDrug(id, name) {
+  if (!confirm(`Delete "${name}" from the formulary? This action cannot be undone.`)) return;
+  try {
+    await Api.drugs.delete(id);
+    UI.toast('Drug deleted.');
+    await loadStock();
+    await loadLookups();
+  } catch (err) {
+    UI.toast(UI.errorMessage(err), 'danger');
+  }
+}
+
+// ---------- Add / Edit Drug Modal ----------
+const STANDARD_CATEGORIES = [
+  'Anti Acid drugs', 'Eye ointment', 'Skin ointment', 'Iv Fluid', 'Syringe',
+  'Anti Pain', 'Dressing materials', 'Disinfectant solution', 'Adhesive Plaster',
+  'Anti bacterial Drug', 'Cardiovascular Drug (CVS)', 'Anti diabetic',
+  'minerals', 'Anti protocol', 'Anti Inflammatory Drugs'
+];
+const STANDARD_UNITS = ['bottle', 'strips', 'capsul', 'packet', 'sachet'];
+
 function openDrugForm() {
   document.getElementById('drug-form').reset();
+  document.getElementById('df-id').value = '';
+  document.getElementById('drug-modal-title').textContent = 'Add Drug';
+  document.getElementById('drug-modal-subtitle').textContent = 'Add a new pharmaceutical stock item to the clinic formulary.';
+  document.getElementById('df-custom-category-wrap').style.display = 'none';
+  document.getElementById('df-custom-category').value = '';
+  document.getElementById('df-custom-unit-wrap').style.display = 'none';
+  document.getElementById('df-custom-unit').value = '';
   document.getElementById('drug-modal-backdrop').classList.add('visible');
 }
+
+function openEditDrugForm(d) {
+  if (!d) return;
+  document.getElementById('drug-form').reset();
+  document.getElementById('df-id').value = d.id;
+  document.getElementById('drug-modal-title').textContent = `Edit Drug — ${d.name}`;
+  document.getElementById('drug-modal-subtitle').textContent = `Update item code, clinical category, thresholds, quantity, and expiration date.`;
+
+  document.getElementById('df-code').value = d.drug_code || '';
+  document.getElementById('df-name').value = d.name || '';
+  
+  if (d.category && STANDARD_CATEGORIES.includes(d.category)) {
+    document.getElementById('df-category').value = d.category;
+    document.getElementById('df-custom-category-wrap').style.display = 'none';
+    document.getElementById('df-custom-category').value = '';
+  } else if (d.category) {
+    document.getElementById('df-category').value = 'other';
+    document.getElementById('df-custom-category-wrap').style.display = '';
+    document.getElementById('df-custom-category').value = d.category;
+  } else {
+    document.getElementById('df-category').value = '';
+    document.getElementById('df-custom-category-wrap').style.display = 'none';
+    document.getElementById('df-custom-category').value = '';
+  }
+  
+  const unitClean = (d.unit || '').replace(/\s*\([^)]*\)/g, '').trim().toLowerCase();
+  const matchedStandardUnit = STANDARD_UNITS.find(u => u.toLowerCase() === unitClean || u.toLowerCase() === (d.unit || '').toLowerCase());
+  if (matchedStandardUnit) {
+    document.getElementById('df-unit').value = matchedStandardUnit;
+    document.getElementById('df-custom-unit-wrap').style.display = 'none';
+    document.getElementById('df-custom-unit').value = '';
+  } else if (d.unit) {
+    document.getElementById('df-unit').value = 'other';
+    document.getElementById('df-custom-unit').value = d.unit;
+    document.getElementById('df-custom-unit-wrap').style.display = '';
+  } else {
+    document.getElementById('df-unit').value = '';
+    document.getElementById('df-custom-unit-wrap').style.display = 'none';
+    document.getElementById('df-custom-unit').value = '';
+  }
+
+
+  document.getElementById('df-batch').value = d.batch_no || '';
+  
+  const stock = d.stock || {};
+  document.getElementById('df-threshold').value = stock.reorder_threshold !== undefined ? stock.reorder_threshold : 0;
+  document.getElementById('df-max').value = stock.max_threshold !== null && stock.max_threshold !== undefined ? stock.max_threshold : '';
+  document.getElementById('df-quantity').value = stock.quantity_on_hand !== undefined ? stock.quantity_on_hand : 0;
+  document.getElementById('df-expiry').value = d.expiry_date ? d.expiry_date.slice(0, 10) : '';
+  document.getElementById('df-description').value = d.description || '';
+
+  document.getElementById('drug-modal-backdrop').classList.add('visible');
+}
+
+function openEditDrugFormById(id) {
+  const d = drugsCache.find(x => String(x.id) === String(id));
+  if (d) openEditDrugForm(d);
+}
+
 function closeDrugForm() { document.getElementById('drug-modal-backdrop').classList.remove('visible'); }
 document.getElementById('new-drug-btn').addEventListener('click', openDrugForm);
+
+const categorySelect = document.getElementById('df-category');
+if (categorySelect) {
+  categorySelect.addEventListener('change', () => {
+    const isOther = categorySelect.value === 'other';
+    document.getElementById('df-custom-category-wrap').style.display = isOther ? '' : 'none';
+    if (isOther) {
+      document.getElementById('df-custom-category').focus();
+    } else {
+      document.getElementById('df-custom-category').value = '';
+    }
+  });
+}
+
+const unitSelect = document.getElementById('df-unit');
+if (unitSelect) {
+  unitSelect.addEventListener('change', () => {
+    const isOther = unitSelect.value === 'other';
+    document.getElementById('df-custom-unit-wrap').style.display = isOther ? '' : 'none';
+    if (isOther) {
+      document.getElementById('df-custom-unit').focus();
+    } else {
+      document.getElementById('df-custom-unit').value = '';
+    }
+  });
+}
+
+const importIconSlot = document.getElementById('import-icon-slot');
+if (importIconSlot) importIconSlot.innerHTML = Icons.render('upload');
+
+const exportIconSlot = document.getElementById('export-icon-slot');
+if (exportIconSlot) exportIconSlot.innerHTML = Icons.render('download');
+
+const drugPlusIconSlot = document.getElementById('drug-plus-icon-slot');
+if (drugPlusIconSlot) drugPlusIconSlot.innerHTML = Icons.render('plus');
+
+if (importDrugsBtn) {
+  importDrugsBtn.addEventListener('click', () => {
+    ImportModal.open('drugs', () => {
+      loadStock();
+      loadLookups();
+    });
+  });
+}
+
+const exportDrugsBtn = document.getElementById('export-drugs-btn');
+if (exportDrugsBtn) {
+  exportDrugsBtn.addEventListener('click', () => {
+    ExportModal.open('drugs');
+  });
+}
+
 document.getElementById('drug-modal-close').addEventListener('click', closeDrugForm);
 document.getElementById('drug-form-cancel').addEventListener('click', closeDrugForm);
 document.getElementById('drug-modal-backdrop').addEventListener('click', (e) => { if (e.target.id === 'drug-modal-backdrop') closeDrugForm(); });
 
 document.getElementById('drug-form').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const id = document.getElementById('df-id').value;
+  const drugCode = document.getElementById('df-code').value.trim();
+  const name = document.getElementById('df-name').value.trim();
+  
+  let category = document.getElementById('df-category').value;
+  if (category === 'other') {
+    category = document.getElementById('df-custom-category').value.trim();
+    if (!category) {
+      UI.toast('Please type a custom category name.', 'danger');
+      document.getElementById('df-custom-category').focus();
+      return;
+    }
+  }
+
+  let unit = document.getElementById('df-unit').value;
+  if (unit === 'other') {
+    unit = document.getElementById('df-custom-unit').value.trim();
+    if (!unit) {
+      UI.toast('Please type a custom unit of measurement.', 'danger');
+      document.getElementById('df-custom-unit').focus();
+      return;
+    }
+  }
+
+  const batchNo = document.getElementById('df-batch').value.trim();
+  const rawQty = document.getElementById('df-quantity').value;
+  const rawThreshold = document.getElementById('df-threshold').value;
+  const rawMax = document.getElementById('df-max').value;
+  const rawExpiry = document.getElementById('df-expiry').value;
+  const description = document.getElementById('df-description').value.trim();
+
   const payload = {
-    name: document.getElementById('df-name').value.trim(),
-    unit: document.getElementById('df-unit').value.trim(),
-    description: document.getElementById('df-description').value.trim(),
-    initial_quantity: document.getElementById('df-quantity').value,
-    reorder_threshold: document.getElementById('df-threshold').value,
+    drug_code: drugCode || null,
+    name,
+    category: category || null,
+    unit: unit || null,
+    batch_no: batchNo || null,
+    description: description || null,
+    reorder_threshold: rawThreshold !== '' ? Number(rawThreshold) : 0,
+    max_threshold: rawMax !== '' ? Number(rawMax) : null,
+    expiry_date: rawExpiry ? rawExpiry : null,
   };
+
   const btn = document.getElementById('drug-form-submit');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Saving…';
   try {
-    await Api.drugs.create(payload);
-    UI.toast('Drug added.');
+    if (id) {
+      payload.quantity_on_hand = rawQty !== '' ? Number(rawQty) : 0;
+      await Api.drugs.update(id, payload);
+      UI.toast('Drug updated successfully.');
+    } else {
+      payload.initial_quantity = rawQty !== '' ? Number(rawQty) : 0;
+      await Api.drugs.create(payload);
+      UI.toast('Drug added to formulary.');
+    }
     closeDrugForm();
-    loadStock();
+    await loadStock();
+    await loadLookups();
   } catch (err) {
     UI.toast(UI.errorMessage(err), 'danger');
   } finally {
@@ -382,9 +728,14 @@ document.getElementById('drug-form').addEventListener('submit', async (e) => {
 let restockDrugId = null;
 function openRestockForm(drugId) {
   restockDrugId = drugId;
-  const drug = drugsCache.find(d => d.id === drugId);
+  const drug = drugsCache.find(d => String(d.id) === String(drugId));
   document.getElementById('restock-form').reset();
   document.getElementById('restock-title').textContent = `Adjust Stock — ${drug ? drug.name : ''}`;
+  if (drug && drug.expiry_date) {
+    document.getElementById('rs-expiry').value = drug.expiry_date.slice(0, 10);
+  } else {
+    document.getElementById('rs-expiry').value = '';
+  }
   document.getElementById('restock-modal-backdrop').classList.add('visible');
 }
 function closeRestockForm() { document.getElementById('restock-modal-backdrop').classList.remove('visible'); }
@@ -395,15 +746,17 @@ document.getElementById('restock-modal-backdrop').addEventListener('click', (e) 
 document.getElementById('restock-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const delta = Number(document.getElementById('rs-delta').value);
-  if (!delta) { UI.toast('Enter a non-zero quantity.', 'danger'); return; }
+  const expiryDate = document.getElementById('rs-expiry').value || null;
+  if (isNaN(delta)) { UI.toast('Enter a valid quantity change.', 'danger'); return; }
   const btn = document.getElementById('restock-form-submit');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Saving…';
   try {
-    await Api.drugs.adjustStock(restockDrugId, delta);
-    UI.toast('Stock updated.');
+    await Api.drugs.adjustStock(restockDrugId, delta, expiryDate);
+    UI.toast('Stock and expiry updated.');
     closeRestockForm();
-    loadStock();
+    await loadStock();
+    await loadLookups();
   } catch (err) {
     UI.toast(UI.errorMessage(err), 'danger');
   } finally {
@@ -413,6 +766,10 @@ document.getElementById('restock-form').addEventListener('submit', async (e) => 
 });
 
 document.getElementById('stock-search-input').addEventListener('input', debounce(loadStock, 250));
+const categoryFilter = document.getElementById('stock-category-filter');
+if (categoryFilter) categoryFilter.addEventListener('change', loadStock);
+const conditionFilter = document.getElementById('stock-condition-filter');
+if (conditionFilter) conditionFilter.addEventListener('change', loadStock);
 
 // ---------- Init ----------
 async function init() {
@@ -421,5 +778,13 @@ async function init() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('open')) openRxDetail(params.get('open'));
   if (params.get('newFor')) openRxForm(params.get('newFor'));
+
+  setInterval(() => {
+    const activeBackdrop = document.querySelector('.modal-backdrop.visible');
+    if (!activeBackdrop) {
+      loadRx();
+    }
+  }, 10000);
 }
 init();
+

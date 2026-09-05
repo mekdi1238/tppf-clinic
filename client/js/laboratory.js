@@ -12,6 +12,11 @@ document.getElementById('plus-icon-slot').innerHTML = Icons.render('plus');
 document.getElementById('order-modal-close').innerHTML = Icons.render('close');
 document.getElementById('order-detail-close').innerHTML = Icons.render('close');
 
+const newOrderBtn = document.getElementById('new-order-btn');
+if (newOrderBtn && typeof Permissions !== 'undefined') {
+  newOrderBtn.style.display = Permissions.has('lab.create_order') ? 'inline-flex' : 'none';
+}
+
 let physiciansCache = [];
 let visitsCache = [];
 let catalogCache = [];
@@ -34,10 +39,28 @@ const TAB_PANELS = {
     label: 'Hematology',
     containerId: 'lab-tests-Hematology',
     panelTabId: 'tab-panel-Hematology',
-    // left column panels / right column panels for 2-col layout
     sections: [
-      { name: null,        catalogPanel: 'Hematology', codes: ['WBC','DIFF','CBC','ESR','HGB','HCT'] },
-      { name: null,        catalogPanel: 'Hematology', codes: ['BF','CPP','HCVAB','HBSAG','HPAB','RPR-VDRL','SEROLOGY'] },
+      {
+        name: 'Cell Counts & Leukocyte Differentials',
+        catalogPanel: 'Hematology',
+        codes: ['WBC', 'DIFF', 'CBC', 'ESR', 'HGB', 'HCT', 'LYMPH', 'MID', 'GRAN'],
+      },
+      {
+        name: 'Erythrocyte & Thrombocyte Indices',
+        catalogPanel: 'Hematology',
+        codes: ['RBC', 'MCV', 'MCH', 'MCHC', 'RDW-CV', 'RDW-SD', 'PLT', 'MPV', 'PDW', 'PCT'],
+      },
+      {
+        name: 'Serology & Rapid Tests',
+        catalogPanel: 'Hematology',
+        codes: ['BF', 'CPP', 'HCVAB', 'HBSAG', 'HPAB', 'RPR-VDRL', 'SEROLOGY'],
+        subsections: [
+          {
+            name: 'WWF',
+            codes: ['SO', 'SH', 'Ox19'],
+          },
+        ],
+      },
     ],
   },
   'Parasitology|Urinalysis': {
@@ -45,8 +68,21 @@ const TAB_PANELS = {
     containerId: 'lab-tests-ParasitologyUrinalysis',
     panelTabId: 'tab-panel-Parasitology|Urinalysis',
     sections: [
-      { name: 'Parasitology', catalogPanel: 'Parasitology', codes: null },
-      { name: 'Urinalysis',   catalogPanel: 'Urinalysis',   codes: null },
+      {
+        name: 'Stool Examination',
+        catalogPanel: 'Stool',
+        codes: ['STOOL', 'STOOL-COLOR', 'STOOL-CONSISTENCY', 'STOOL-ME'],
+      },
+      {
+        name: 'Parasitology & Antigens',
+        catalogPanel: 'Parasitology',
+        codes: ['CONCENTRATION', 'HPAG', 'OCCULT-BLOOD'],
+      },
+      {
+        name: 'Urinalysis',
+        catalogPanel: 'Urinalysis',
+        codes: null,
+      },
     ],
   },
   'Sed|Bacteriology|Other': {
@@ -54,9 +90,9 @@ const TAB_PANELS = {
     containerId: 'lab-tests-SedBacteriologyOther',
     panelTabId: 'tab-panel-Sed|Bacteriology|Other',
     sections: [
-      { name: 'Sed (Sediment)',     catalogPanel: 'Sed',               codes: null },
-      { name: 'Bacteriology',       catalogPanel: 'Bacteriology',      codes: null },
-      { name: 'Other Body Fluids',  catalogPanel: 'Other Body Fluids', codes: null },
+      { name: 'Sed (Sediment / Microscopy)', catalogPanel: 'Sed', codes: null },
+      { name: 'Bacteriology', catalogPanel: 'Bacteriology', codes: null },
+      { name: 'Other Body Fluids', catalogPanel: 'Other Body Fluids', codes: null },
     ],
   },
   'Chemistry': {
@@ -88,44 +124,44 @@ function populateOrderFormTabs() {
     const container = document.getElementById(tabDef.containerId);
     if (!container) continue;
 
-    if (tabDef.sections.length === 1 && !tabDef.sections[0].name) {
-      // Single un-named section (Hematology split or Chemistry)
-      if (tabKey === 'Hematology') {
-        // Hematology: left and right column explicitly defined by codes
-        const leftCodes = tabDef.sections[0].codes;
-        const rightCodes = tabDef.sections[1].codes;
-        const allHema = catalogCache.filter(t => t.panel === 'Hematology');
-        const left = allHema.filter(t => leftCodes.includes(t.code));
-        const right = allHema.filter(t => rightCodes.includes(t.code));
-
-        container.innerHTML = `
-          <div>${buildTestRows(left)}</div>
-          <div>${buildTestRows(right)}</div>
-        `;
-      } else {
-        // Chemistry — 3 even columns
-        const tests = catalogCache.filter(t => t.panel === 'Chemistry');
-        const third = Math.ceil(tests.length / 3);
-        container.innerHTML = `
-          <div>${buildTestRows(tests.slice(0, third))}</div>
-          <div>${buildTestRows(tests.slice(third, third * 2))}</div>
-          <div>${buildTestRows(tests.slice(third * 2))}</div>
-        `;
-      }
+    if (tabKey === 'Chemistry') {
+      // Chemistry — 3 even columns
+      const tests = catalogCache.filter(t => t.panel === 'Chemistry');
+      const third = Math.ceil(tests.length / 3);
+      container.innerHTML = `
+        <div>${buildTestRows(tests.slice(0, third))}</div>
+        <div>${buildTestRows(tests.slice(third, third * 2))}</div>
+        <div>${buildTestRows(tests.slice(third * 2))}</div>
+      `;
     } else {
-      // Multi-section tabs (Parasitology/Urinalysis, Sed/Bacteriology/Other)
+      // Multi-section tabs (Hematology, Parasitology/Urinalysis, Sed/Bacteriology/Other)
       let html = '';
       for (const section of tabDef.sections) {
-        let tests;
+        let tests = [];
         if (section.codes) {
-          tests = catalogCache.filter(t => section.codes.includes(t.code));
-        } else {
+          tests = section.codes.map(c => catalogCache.find(t => t.code.toUpperCase() === c.toUpperCase())).filter(Boolean);
+        } else if (section.catalogPanel) {
           tests = catalogCache.filter(t => t.panel === section.catalogPanel);
         }
+
+        let subHtml = '';
+        if (section.subsections && section.subsections.length) {
+          for (const sub of section.subsections) {
+            const subTests = sub.codes.map(c => catalogCache.find(t => t.code.toUpperCase() === c.toUpperCase())).filter(Boolean);
+            subHtml += `
+              <div style="margin-top:14px;">
+                ${sub.name ? `<div class="lab-panel-section-title" style="margin-top:6px; margin-bottom:6px;">${UI.escapeHtml(sub.name)}</div>` : ''}
+                ${buildTestRows(subTests)}
+              </div>
+            `;
+          }
+        }
+
         html += `
           <div>
             ${section.name ? `<div class="lab-panel-section-title">${UI.escapeHtml(section.name)}</div>` : ''}
             ${buildTestRows(tests)}
+            ${subHtml}
           </div>
         `;
       }
@@ -246,8 +282,14 @@ function renderTable(list) {
               <td class="cell-muted">${UI.formatDateTime(o.order_date)}</td>
               <td class="cell-muted">${o.items.map(i => i.test ? UI.escapeHtml(i.test.code) : '?').join(', ')}</td>
               <td>${UI.labOrderStatusBadge(o.status)}</td>
-              <td><button class="icon-btn" title="View" onclick="openOrderDetail('${o.id}')">${Icons.render('eye')}</button></td>
+              <td>
+                <div style="display:flex; align-items:center; gap:4px;">
+                  <button class="icon-btn" title="View" onclick="openOrderDetail('${o.id}')">${Icons.render('eye')}</button>
+                  <button class="icon-btn icon-btn-danger" title="Delete Lab Order" onclick="deleteLabOrder('${o.id}', event)">${Icons.render('trash')}</button>
+                </div>
+              </td>
             </tr>
+
           `).join('')}
         </tbody>
       </table>
@@ -263,6 +305,7 @@ function openOrderForm(visitId = null) {
   }
   document.getElementById('order-form').reset();
   document.querySelectorAll('input[name="of-test"]').forEach(cb => cb.checked = false);
+  document.getElementById('of-physician-note').value = '';
   updateSelectedSummary();
 
   // Reset to first tab
@@ -299,6 +342,7 @@ document.getElementById('order-form').addEventListener('submit', async (e) => {
     patient_code: visit.patient.patient_code,
     physician_id: document.getElementById('of-physician').value,
     test_ids: testIds,
+    physician_note: document.getElementById('of-physician-note').value.trim() || null,
   };
   if (!payload.physician_id) { UI.toast('Select the ordering physician.', 'danger'); return; }
 
@@ -330,7 +374,7 @@ async function openOrderDetail(id) {
 }
 
 const NEXT_LAB_STATUS = { pending: 'in_progress', in_progress: 'completed' };
-const NEXT_LAB_LABEL  = { in_progress: 'Mark In Progress', completed: 'Mark Completed' };
+const NEXT_LAB_LABEL = { in_progress: 'Mark In Progress', completed: 'Mark Completed' };
 
 /* ── Group detail items by panel for tabbed display ── */
 function groupItemsByPanel(items) {
@@ -353,36 +397,41 @@ function renderOrderDetail(o) {
 
   let panelHtml = '';
   // Ordered panels for display
-  const PANEL_ORDER = ['Hematology','Parasitology','Urinalysis','Sed','Bacteriology','Other Body Fluids','Chemistry','Other'];
+  const PANEL_ORDER = ['Hematology', 'Stool', 'Parasitology', 'Urinalysis', 'Sed', 'Bacteriology', 'Other Body Fluids', 'Chemistry', 'Other'];
   const panelKeys = [...new Set([...PANEL_ORDER, ...Object.keys(groups)])].filter(k => groups[k]);
 
   for (const panel of panelKeys) {
     const items = groups[panel];
     if (!items || !items.length) continue;
     panelHtml += `
-      <div class="lab-result-section-head">${UI.escapeHtml(panel)}</div>
+      <div class="lab-result-section-head">${UI.escapeHtml(panel === 'Stool' ? 'Stool Examination' : panel)}</div>
       ${items.map(i => {
-        const range = (i.test && i.test.normal_range) ? i.test.normal_range : '';
-        return `
-          <div class="lab-result-item">
+      const range = (i.test && i.test.normal_range) ? i.test.normal_range : '';
+      const flag = UI.checkLabResultRange(i.result_value, range);
+      return `
+          <div class="lab-result-item" id="lab-item-box-${i.id}">
             <span class="lab-result-label">${i.test ? UI.escapeHtml(i.test.code) : '?'}</span>
             <input type="text"
               class="lab-result-input"
               data-item-id="${i.id}"
+              data-range="${UI.escapeHtml(range)}"
               value="${UI.escapeHtml(i.result_value || '')}"
               placeholder="${range ? 'e.g. ' + range : 'Result…'}"
               ${canEnter ? '' : 'disabled'}
             />
             ${range ? `<span class="lab-result-range">${UI.escapeHtml(range)}</span>` : ''}
+            <span class="lab-result-flag" id="lab-item-flag-${i.id}" style="min-width:65px; display:inline-flex; align-items:center;">
+              ${flag ? flag.badgeHtml : ''}
+            </span>
             <span id="lab-item-action-${i.id}" style="flex-shrink:0;">
               ${canEnter
-                ? `<button type="button" class="btn btn-secondary btn-sm" data-save-item="${i.id}">Save</button>`
-                : (i.entered_at ? `<span class="text-muted" style="font-size:11px;">${UI.formatDateTime(i.entered_at)}</span>` : '')
-              }
+          ? `<button type="button" class="btn btn-secondary btn-sm" data-save-item="${i.id}">Save</button>`
+          : (i.entered_at ? `<span class="text-muted" style="font-size:11px;">${UI.formatDateTime(i.entered_at)}</span>` : '')
+        }
             </span>
           </div>
         `;
-      }).join('')}
+    }).join('')}
     `;
   }
 
@@ -392,8 +441,75 @@ function renderOrderDetail(o) {
       <h4>Test Results</h4>
       <div class="lab-result-grid">${panelHtml}</div>
     </div>
+
+    <!-- Notes Exchange Section -->
+    <div class="detail-section" style="margin-top:4px;">
+      <h4 style="margin-bottom:12px;">${Icons.render('info')} Notes</h4>
+
+      <!-- Physician note (read-only for lab tech, always shown) -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px; font-weight:700; color:var(--color-primary); text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px;">
+          ${Icons.render('stethoscope')} ${UI.escapeHtml(o.physician_full_name || physicianName(o.physician_id) || 'Physician')} (Ordering Physician)
+        </div>
+        ${o.physician_note
+      ? `<div style="background:var(--color-info-light); border:1px solid var(--color-info); border-left:4px solid var(--color-info); border-radius:8px; padding:10px 14px; font-size:13.5px; color:var(--color-text); white-space:pre-wrap;">${UI.escapeHtml(o.physician_note)}</div>`
+      : `<p class="text-muted" style="font-size:13px; font-style:italic;">No note from the physician.</p>`
+    }
+      </div>
+
+      <!-- Technician note (editable if order not completed) -->
+      <div>
+        <div style="font-size:12px; font-weight:700; color:var(--color-accent); text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px;">
+          ${Icons.render('flask')} Lab Technician Note
+        </div>
+        ${canEnter
+      ? `<div style="display:flex; flex-direction:column; gap:8px;">
+               <textarea id="od-tech-note" rows="2" placeholder="Add findings, observations, or a message to the physician…" style="resize:vertical; font-size:13.5px;">${UI.escapeHtml(o.technician_note || '')}</textarea>
+               <button type="button" class="btn btn-secondary btn-sm" id="od-tech-note-save" style="align-self:flex-end;">${Icons.render('check')} Save Note</button>
+             </div>`
+      : (o.technician_note
+        ? `<div style="background:var(--color-accent-light); border:1px solid var(--color-accent); border-left:4px solid var(--color-accent); border-radius:8px; padding:10px 14px; font-size:13.5px; color:var(--color-text); white-space:pre-wrap;">${UI.escapeHtml(o.technician_note)}</div>`
+        : `<p class="text-muted" style="font-size:13px; font-style:italic;">No note from the lab technician.</p>`
+      )
+    }
+      </div>
+    </div>
+
     <div id="order-block-notice"></div>
   `;
+
+  // Live range badge calculation as technician types
+  document.querySelectorAll('.lab-result-input').forEach(input => {
+    input.addEventListener('input', () => {
+      const range = input.dataset.range;
+      const itemId = input.dataset.itemId;
+      const flagSlot = document.getElementById(`lab-item-flag-${itemId}`);
+      if (flagSlot) {
+        const flag = UI.checkLabResultRange(input.value, range);
+        flagSlot.innerHTML = flag ? flag.badgeHtml : '';
+      }
+    });
+  });
+
+  // Wire technician note save button
+  const techNoteSaveBtn = document.getElementById('od-tech-note-save');
+  if (techNoteSaveBtn) {
+    techNoteSaveBtn.addEventListener('click', async () => {
+      const noteText = document.getElementById('od-tech-note').value.trim();
+      techNoteSaveBtn.disabled = true;
+      techNoteSaveBtn.innerHTML = '<span class="spinner"></span>';
+      try {
+        await Api.labOrders.updateNote(o.id, noteText);
+        UI.toast('Lab technician note saved.');
+        techNoteSaveBtn.disabled = false;
+        techNoteSaveBtn.innerHTML = `${Icons.render('check')} Save Note`;
+      } catch (e) {
+        UI.toast(UI.errorMessage(e), 'danger');
+        techNoteSaveBtn.disabled = false;
+        techNoteSaveBtn.innerHTML = `${Icons.render('check')} Save Note`;
+      }
+    });
+  }
 
   // Wire Save buttons
   document.getElementById('order-detail-body').querySelectorAll('[data-save-item]').forEach(btn => {
@@ -427,11 +543,13 @@ function renderOrderDetail(o) {
   const printBtn = o.status === 'completed'
     ? `<button class="btn btn-secondary" id="order-print-btn">${Icons.render('reports')} Print Report</button>`
     : '';
+  const deleteBtn = `<button class="btn btn-danger btn-sm" id="order-delete-btn" style="margin-right:auto; display:inline-flex; align-items:center; gap:4px;">${Icons.render('trash')} Delete Order</button>`;
 
   if (!next) {
-    footer.innerHTML = `<span class="footer-note">This order is completed.</span>${printBtn}<button class="btn btn-secondary" id="order-close-modal">Close</button>`;
+    footer.innerHTML = `${deleteBtn}<span class="footer-note">This order is completed.</span>${printBtn}<button class="btn btn-secondary" id="order-close-modal">Close</button>`;
   } else {
     footer.innerHTML = `
+      ${deleteBtn}
       ${printBtn}
       <button class="btn btn-secondary" id="order-close-modal">Close</button>
       <button class="btn btn-primary" id="order-advance">${NEXT_LAB_LABEL[next]}</button>
@@ -439,6 +557,8 @@ function renderOrderDetail(o) {
   }
 
   document.getElementById('order-close-modal').addEventListener('click', closeOrderDetail);
+  const delBtn = document.getElementById('order-delete-btn');
+  if (delBtn) delBtn.addEventListener('click', () => deleteLabOrder(o.id));
   const printButton = document.getElementById('order-print-btn');
   if (printButton) printButton.addEventListener('click', () => window.print());
 
@@ -448,6 +568,13 @@ function renderOrderDetail(o) {
       advanceBtn.disabled = true;
       advanceBtn.innerHTML = '<span class="spinner"></span> Updating…';
       try {
+        const noteEl = document.getElementById('od-tech-note');
+        if (noteEl) {
+          const noteText = noteEl.value.trim();
+          if (noteText !== (o.technician_note || '')) {
+            await Api.labOrders.updateNote(o.id, noteText);
+          }
+        }
         await Api.labOrders.updateStatus(o.id, next);
         UI.toast(`Order moved to "${next.replace('_', ' ')}".`);
         const fresh = await Api.labOrders.get(o.id);
@@ -463,6 +590,20 @@ function renderOrderDetail(o) {
     });
   }
 }
+
+window.deleteLabOrder = async function(id, event) {
+  if (event) event.stopPropagation();
+  if (!confirm('Are you sure you want to delete this lab order? It will also be removed from the patient visit record.')) return;
+  try {
+    await Api.labOrders.delete(id);
+    UI.toast('Lab order deleted successfully.');
+    closeOrderDetail();
+    loadOrders();
+  } catch (err) {
+    UI.toast(UI.errorMessage(err), 'danger');
+  }
+};
+
 
 function closeOrderDetail() {
   document.getElementById('order-detail-backdrop').classList.remove('visible');
@@ -481,5 +622,12 @@ async function init() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('open')) openOrderDetail(params.get('open'));
   if (params.get('newFor')) openOrderForm(params.get('newFor'));
+
+  setInterval(() => {
+    const activeBackdrop = document.querySelector('.modal-backdrop.visible');
+    if (!activeBackdrop) {
+      loadOrders();
+    }
+  }, 8000);
 }
 init();

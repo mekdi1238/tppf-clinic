@@ -6,14 +6,15 @@ Auth.requireAuth();
 renderShell('patients');
 setPageTitle('Patients');
 
-const PATIENT_PERMS = {
-  lab_technician: { create: false, edit: false, visitHistory: 'department', canStartVisit: false },
-  pharmacist: { create: false, edit: false, visitHistory: 'department', canStartVisit: false },
-  receptionist: { create: true, edit: true, visitHistory: 'none', canStartVisit: true },
-  physician: { create: false, edit: false, visitHistory: 'full', canStartVisit: true },
-};
 const restrictedRole = RoleGuard.restrictedRole();
-const perms = restrictedRole ? PATIENT_PERMS[restrictedRole] : { create: true, edit: true, visitHistory: 'full', canStartVisit: true };
+const perms = {
+  create: typeof Permissions !== 'undefined' ? Permissions.has('patients.create') : true,
+  edit: typeof Permissions !== 'undefined' ? Permissions.has('patients.edit') : true,
+  visitHistory: typeof Permissions !== 'undefined'
+    ? (Permissions.has('patients.view_history') ? 'full' : (restrictedRole ? 'department' : 'full'))
+    : 'full',
+  canStartVisit: typeof Permissions !== 'undefined' ? Permissions.has('visits.create') : true,
+};
 
 document.getElementById('search-icon-slot').innerHTML = Icons.render('search');
 document.getElementById('plus-icon-slot').innerHTML = Icons.render('plus');
@@ -47,15 +48,40 @@ if (!perms.create) {
 let currentList = [];
 let editingId = null;
 
-const DEPARTMENT_POSITIONS = {
-  'Medical': ['Physician (General)', 'Specialist Physician', 'Lab Technician', 'Pharmacist', 'Nurse', 'Radiologist', 'Medical Officer'],
-  'Finance': ['Finance Officer', 'Accountant', 'Senior Accountant', 'Finance Manager', 'Budget Officer'],
-  'Human Resource Management': ['HR Manager', 'HR Officer', 'HR Administrator', 'Safety Officer', 'Security Officer', 'Security Guard', 'Safety and Security Supervisor'],
-  'Planning and Budget Service': ['Planning Officer', 'Budget Analyst', 'Planning Manager', 'Budget Planning Coordinator'],
-  'Product Quality Control Service': ['Quality Control Inspector', 'QC Supervisor', 'Quality Assurance Officer', 'QC Manager'],
-  'Production and Technic': ['Technician', 'Machine Operator', 'Production Supervisor', 'Senior Technician', 'Maintenance Engineer'],
-  'Property Management': ['Property Officer', 'Facility Manager', 'Property Supervisor', 'Maintenance Officer'],
-};
+let DEPARTMENT_POSITIONS = {};
+let dynamicDepartments = [];
+
+async function loadDepartmentOptions() {
+  try {
+    dynamicDepartments = await Api.departments.list();
+    DEPARTMENT_POSITIONS = {};
+    for (const d of dynamicDepartments) {
+      DEPARTMENT_POSITIONS[d.name] = (d.positions || []).map(p => p.name);
+    }
+
+    // Populate department-filter
+    const deptFilter = document.getElementById('department-filter');
+    if (deptFilter) {
+      const currentVal = deptFilter.value;
+      deptFilter.innerHTML = `<option value="all">All departments</option>` +
+        dynamicDepartments.map(d => `<option value="${UI.escapeHtml(d.name)}">${UI.escapeHtml(d.name)}</option>`).join('');
+      if (currentVal && (currentVal === 'all' || dynamicDepartments.some(d => d.name === currentVal))) {
+        deptFilter.value = currentVal;
+      }
+    }
+
+    // Populate pf-department in modal
+    const pfDept = document.getElementById('pf-department');
+    if (pfDept) {
+      const currentVal = pfDept.value;
+      pfDept.innerHTML = `<option value="">Select department…</option>` +
+        dynamicDepartments.map(d => `<option value="${UI.escapeHtml(d.name)}">${UI.escapeHtml(d.name)}</option>`).join('');
+      if (currentVal) pfDept.value = currentVal;
+    }
+  } catch (err) {
+    console.error('Failed to load department options', err);
+  }
+}
 
 function debounce(fn, ms) {
   let t;
@@ -93,7 +119,7 @@ function renderTable(list) {
       <table class="data-table">
         <thead>
           <tr>
-            <th>Code</th><th>Full name</th><th>Gender</th><th>Department</th><th>Age</th><th>Phone</th><th>Registered</th><th>Status</th><th></th>
+            <th>Code</th><th>Full name</th><th>Department</th><th>Medical Certificate</th><th>Age</th><th>Phone</th><th>Registered</th><th>Status</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -106,8 +132,11 @@ function renderTable(list) {
                   <span>${UI.escapeHtml(p.full_name)}</span>
                 </div>
               </td>
-              <td class="cell-muted" style="text-transform:capitalize;">${p.gender || '—'}</td>
-              <td class="cell-muted">${p.department ? UI.escapeHtml(p.department) : '—'}</td>
+              <td class="cell-muted">
+                <div>${p.department ? UI.escapeHtml(p.department) : '—'}</div>
+                <div style="font-size:11px; color:var(--color-text-muted);">${UI.escapeHtml(p.position || 'Staff')}</div>
+              </td>
+              <td>${UI.medicalCertificateBadge(p)}</td>
               <td class="cell-muted">${UI.age(p.date_of_birth)}</td>
               <td class="cell-muted">${UI.escapeHtml(p.phone) || '—'}</td>
               <td class="cell-muted">${UI.formatDate(p.registered_date)}</td>
@@ -148,7 +177,7 @@ async function openPatientForm(id = null) {
     document.getElementById('patient-modal-title').textContent = 'Edit Patient';
     document.getElementById('patient-modal-sub').textContent = `Update details for ${p.patient_code}.`;
     document.getElementById('pf-full-name').value = p.full_name || '';
-    document.getElementById('pf-dob').value = p.date_of_birth || '';
+    document.getElementById('pf-dob').value = p.date_of_birth ? String(p.date_of_birth).slice(0, 10) : '';
     document.getElementById('pf-gender').value = p.gender || '';
     document.getElementById('pf-department').value = p.department || '';
     document.getElementById('pf-department').dispatchEvent(new Event('change'));
@@ -289,6 +318,16 @@ async function openPatientDetail(id) {
       }
     };
 
+    const certBtn = document.getElementById('pd-cert-btn');
+    if (certBtn) {
+      const hasCert = !!(p.latest_certificate_id || (p.certifications && p.certifications.length > 0));
+      certBtn.textContent = hasCert ? 'Renew Certificate' : 'Record Certificate';
+      certBtn.onclick = () => {
+        closePatientDetail();
+        window.location.href = `certifications.html?patientId=${p.id}`;
+      };
+    }
+
     document.getElementById('patient-detail-backdrop').classList.add('visible');
   } catch (e) {
     UI.toast(UI.errorMessage(e), 'danger');
@@ -308,6 +347,9 @@ async function deletePatientList(e, id) {
 }
 
 function renderFullPatientDetail(p) {
+  const certs = p.certifications || [];
+  const latestCert = certs[0] || null;
+
   document.getElementById('patient-detail-body').innerHTML = `
     <div class="detail-section">
       <h4>Patient information</h4>
@@ -321,12 +363,40 @@ function renderFullPatientDetail(p) {
         <div class="detail-item"><div class="k">Location</div><div class="v">${UI.escapeHtml(p.location) || '—'}</div></div>
         <div class="detail-item"><div class="k">Address</div><div class="v">${UI.escapeHtml(p.address) || '—'}</div></div>
       </div>
-      ${p.source_employee_registration_id ? `
-        <div class="notice notice-info" style="margin-top:14px;">
-          ${Icons.render('info')}
-          <span>This patient originated as a pre-employment candidate (${p.source_employee_registration_id}) who was hired. That record is preserved permanently in Employee Registrations.</span>
-        </div>` : ''}
     </div>
+
+    <div class="detail-section">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <h4 style="margin:0;">Medical Fitness Certification &amp; 6-Month Checkup</h4>
+        ${UI.medicalCertificateBadge(p)}
+      </div>
+
+      <div class="detail-grid" style="margin-bottom:10px;">
+        <div class="detail-item"><div class="k">Last Examination Date</div><div class="v" style="font-weight:600;">${p.last_fitness_exam_date ? UI.formatDate(p.last_fitness_exam_date) : (latestCert ? UI.formatDate(latestCert.examination_date) : 'Not recorded')}</div></div>
+        <div class="detail-item"><div class="k">6-Month Card Expiry Date</div><div class="v" style="font-weight:600;">${p.next_checkup_due_date ? UI.formatDate(p.next_checkup_due_date) : 'Not scheduled'}</div></div>
+        <div class="detail-item"><div class="k">Examining Physician</div><div class="v">${latestCert ? UI.escapeHtml(latestCert.physician_name || '—') : '—'}</div></div>
+        <div class="detail-item"><div class="k">Certification Type</div><div class="v">${latestCert ? (latestCert.certification_type === 'periodic_renewal' ? '6-Month Periodic Renewal' : 'Pre-Employment Initial') : '—'}</div></div>
+      </div>
+
+      ${!certs.length ? `
+        <div class="notice notice-warning" style="margin-top:8px;">
+          ${Icons.render('alert')}
+          <div>
+            <strong>Medical Certificate Not Found:</strong> This employee has no physical fitness examination certificate on record.
+            <div style="margin-top:6px;">
+              <a href="certifications.html?patientId=${p.id}" class="btn btn-secondary btn-sm" style="display:inline-flex; align-items:center; gap:6px;">
+                ${Icons.render('plus')} Record Initial Certificate Now
+              </a>
+            </div>
+          </div>
+        </div>
+      ` : `
+        <div style="font-size:12px; color:var(--color-text-muted); margin-top:6px;">
+          ${certs.length} certificate exam record(s) archived in medical file.
+        </div>
+      `}
+    </div>
+
     <div class="detail-section">
       <h4>Visit history (${p.visits.length})</h4>
       ${p.visits.length ? `
@@ -464,6 +534,7 @@ document.getElementById('status-filter').addEventListener('change', loadPatients
 document.getElementById('department-filter').addEventListener('change', loadPatients);
 
 async function init() {
+  await loadDepartmentOptions();
   await loadPatients();
   const params = new URLSearchParams(window.location.search);
   if (params.get('open')) openPatientDetail(params.get('open'));

@@ -20,7 +20,10 @@ async function loadProfile() {
 
 function renderProfile(user) {
   // Avatar & Header
-  document.getElementById('profile-avatar-large').textContent = Auth.initials(user.full_name || user.username);
+  const avatarLarge = document.getElementById('profile-avatar-large');
+  if (avatarLarge) {
+    avatarLarge.outerHTML = UI.avatar(user.full_name || user.username, user.photo_url, 'width:56px; height:56px; font-size:22px; id="profile-avatar-large"');
+  }
   document.getElementById('profile-header-name').textContent = user.full_name || user.username;
   document.getElementById('profile-header-username').textContent = `@${user.username}`;
   
@@ -33,6 +36,19 @@ function renderProfile(user) {
   // Form fields
   document.getElementById('prof-username').value = user.username || '';
   document.getElementById('prof-fullname').value = user.full_name || '';
+
+  const photoContainer = document.getElementById('prof-photo-container');
+  if (photoContainer && typeof CameraWidget !== 'undefined') {
+    photoContainer.innerHTML = CameraWidget.renderPickerHtml({
+      hiddenInputId: 'prof-photo-url',
+      previewImgId: 'prof-photo-preview',
+      initialUrl: user.photo_url || '',
+    });
+    CameraWidget.bindEvents({
+      hiddenInputId: 'prof-photo-url',
+      previewImgId: 'prof-photo-preview',
+    });
+  }
 }
 
 // Handle Profile Info Update
@@ -46,22 +62,31 @@ document.getElementById('profile-info-form').addEventListener('submit', async (e
     return;
   }
 
+  const photoInput = document.getElementById('prof-photo-url');
+  const photo_url = photoInput ? photoInput.value : null;
+
   const btn = document.getElementById('prof-info-submit');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Saving…';
 
   try {
-    const updated = await Api.profile.update({ username, full_name });
+    const updated = await Api.profile.update({ username, full_name, photo_url });
     userProfileData = updated;
-    Auth.updateUser({ username: updated.username, full_name: updated.full_name });
+    Auth.updateUser({ username: updated.username, full_name: updated.full_name, photo_url: updated.photo_url });
     renderProfile(updated);
     UI.toast('Profile updated successfully!');
     
     // Update topbar display dynamically
     const nameEl = document.querySelector('.topbar-user .name');
-    const avatarEl = document.querySelector('.topbar-user .avatar');
     if (nameEl) nameEl.textContent = updated.full_name || updated.username;
-    if (avatarEl) avatarEl.textContent = Auth.initials(updated.full_name || updated.username);
+
+    const userWrap = document.querySelector('.topbar-user');
+    if (userWrap) {
+      const oldAvatar = userWrap.querySelector('.avatar');
+      if (oldAvatar) {
+        oldAvatar.outerHTML = UI.avatar(updated.full_name || updated.username, updated.photo_url, 'width:32px; height:32px; font-size:12px;');
+      }
+    }
   } catch (err) {
     UI.toast(UI.errorMessage(err), 'danger');
   } finally {
