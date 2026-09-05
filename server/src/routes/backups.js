@@ -15,6 +15,7 @@ const BACKUP_ADMIN = requireRole("system_administrator");
 
 // List all backups
 router.get("/backups", BACKUP_ADMIN, asyncHandler(async (req, res) => {
+  await backupService.syncBackupsFromDisk().catch(() => {});
   const result = await query(
     `SELECT b.*, u.full_name AS created_by_name, u.username AS created_by_username
      FROM database_backups b
@@ -106,6 +107,41 @@ router.post("/backups/:id/restore", BACKUP_ADMIN, asyncHandler(async (req, res) 
   });
 
   res.json({ ok: true, message: `Database successfully restored from ${result.filename}` });
+}));
+
+// Import an external backup file (via upload or file path) and optionally restore
+router.post("/backups/import", BACKUP_ADMIN, asyncHandler(async (req, res) => {
+  const { filename, sql, filePath, label, restoreImmediately } = req.body;
+  const userId = req.user ? req.user.id : null;
+
+  const result = await backupService.importBackup({
+    filename,
+    sql,
+    filePath,
+    label,
+    restoreImmediately: Boolean(restoreImmediately),
+    userId,
+  });
+
+  await logAudit(req, {
+    action: result.restored ? "restore" : "create",
+    module: "backups",
+    tableName: "database_backups",
+    recordId: result.backup.id,
+    description: result.restored
+      ? `Imported and restored database from '${result.backup.filename}'`
+      : `Imported database backup file '${result.backup.filename}' (${(result.backup.file_size / 1024).toFixed(1)} KB)`,
+    afterData: result.backup,
+  });
+
+  res.status(201).json({
+    ok: true,
+    message: result.restored
+      ? `Database imported and successfully restored from ${result.backup.filename}`
+      : `Backup file ${result.backup.filename} imported successfully`,
+    backup: result.backup,
+    restored: result.restored,
+  });
 }));
 
 // Delete backup record and physical file
