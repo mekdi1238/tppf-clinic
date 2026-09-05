@@ -29,13 +29,14 @@
             </select>
             <select class="select-filter" id="department-filter">
               <option value="all">All departments</option>
-              <option value="Medical">Medical</option>
-              <option value="Finance">Finance</option>
+              <option value="Manager">Manager</option>
               <option value="Human Resource Management">Human Resource Management</option>
               <option value="Planning and Budget Service">Planning and Budget Service</option>
-              <option value="Product Quality Control Service">Product Quality Control Service</option>
-              <option value="Production and Technic">Production and Technic</option>
+              <option value="Production Quality Control Service">Production Quality Control Service</option>
+              <option value="Production">Production</option>
+              <option value="Technic">Technic</option>
               <option value="Property Management">Property Management</option>
+              <option value="Finance">Finance</option>
             </select>
           </div>
           <div style="display:flex; gap:10px;">
@@ -91,15 +92,17 @@
               <label for="pf-department">Department</label>
               <select id="pf-department">
                 <option value="">Select department…</option>
-                <option value="Medical">Medical</option>
-                <option value="Finance">Finance</option>
+                <option value="Manager">Manager</option>
                 <option value="Human Resource Management">Human Resource Management</option>
                 <option value="Planning and Budget Service">Planning and Budget Service</option>
-                <option value="Product Quality Control Service">Product Quality Control Service</option>
-                <option value="Production and Technic">Production and Technic</option>
+                <option value="Production Quality Control Service">Production Quality Control Service</option>
+                <option value="Production">Production</option>
+                <option value="Technic">Technic</option>
                 <option value="Property Management">Property Management</option>
+                <option value="Finance">Finance</option>
               </select>
             </div>
+
             <div class="field">
               <label for="pf-position">Position</label>
               <select id="pf-position">
@@ -144,6 +147,7 @@
         <button class="btn btn-secondary" id="pd-edit-btn">Edit Patient</button>
         <button class="btn btn-secondary" id="pd-archive-btn" style="display:none;">Archive Patient</button>
         <button class="btn btn-danger" id="pd-delete-btn" style="display:none; background-color: #dc3545; color: white;">Delete (Hard)</button>
+        <button class="btn btn-secondary" id="pd-cert-btn" style="border-color:var(--color-primary); color:var(--color-primary);">Record Certificate</button>
         <button class="btn btn-primary" id="pd-new-visit-btn">Start New Visit</button>
       </div>
     </div>
@@ -151,7 +155,9 @@
 
   <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
+  
   <script src="js/auth.js"></script>
+  <script src="js/permissions.js"></script>
   <script src="js/roles.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/shell.js"></script>
@@ -161,3 +167,5 @@
   <script src="js/patients.js"></script>
 </body>
 </html>
+
+

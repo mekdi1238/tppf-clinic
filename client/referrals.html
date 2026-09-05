@@ -84,8 +84,16 @@
               <input type="text" id="rf-diagnosis" />
             </div>
             <div class="field span-2">
-              <label for="rf-referred-to">Referred to</label>
-              <input type="text" id="rf-referred-to" placeholder="Facility or department name" required />
+              <label for="rf-referred-to-select">Referred to</label>
+              <select id="rf-referred-to-select" style="width:100%; margin-bottom:6px;">
+                <option value="">Select facility / organization…</option>
+                <option value="Selam clinic">Selam clinic</option>
+                <option value="Beza dental">Beza dental</option>
+                <option value="Governmental org facilities">Governmental org facilities</option>
+                <option value="Other">Other (specify custom facility...)</option>
+              </select>
+              <input type="text" id="rf-referred-to-custom" placeholder="Type custom facility or organization name…" style="display:none; width:100%;" />
+              <input type="hidden" id="rf-referred-to" required />
             </div>
             <div class="field span-2">
               <label for="rf-reason">Reason for referral</label>
@@ -117,6 +125,8 @@
       </div>
       <div class="modal-body" id="referral-detail-body"></div>
       <div class="modal-footer">
+        <button class="btn btn-danger btn-sm" id="referral-detail-delete-btn" style="margin-right:auto; display:inline-flex; align-items:center; gap:4px;">Delete Referral</button>
+        <button type="button" class="btn btn-primary btn-sm" id="referral-detail-print-btn" style="display:inline-flex; align-items:center; gap:6px;">Print Referral Form</button>
         <button class="btn btn-secondary" id="referral-detail-close-btn">Close</button>
       </div>
     </div>
@@ -178,17 +188,25 @@
       </div>
       <div class="modal-body" id="sl-detail-body"></div>
       <div class="modal-footer">
+        <button class="btn btn-danger btn-sm" id="sl-detail-delete-btn" style="margin-right:auto; display:inline-flex; align-items:center; gap:4px;">Delete Certificate</button>
+        <button type="button" class="btn btn-primary btn-sm" id="sl-detail-print-btn" style="display:inline-flex; align-items:center; gap:6px;">Print Sick Leave</button>
         <button class="btn btn-secondary" id="sl-detail-close-btn">Close</button>
       </div>
     </div>
   </div>
 
+
   <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
+  
   <script src="js/auth.js"></script>
+  <script src="js/permissions.js"></script>
   <script src="js/roles.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/shell.js"></script>
+  <script src="js/printDocument.js"></script>
   <script src="js/referrals.js"></script>
 </body>
 </html>
+
+

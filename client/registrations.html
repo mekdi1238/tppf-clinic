@@ -38,13 +38,14 @@
             </select>
             <select class="select-filter" id="department-filter">
               <option value="all">All departments</option>
-              <option value="Medical">Medical</option>
-              <option value="Finance">Finance</option>
+              <option value="Manager">Manager</option>
               <option value="Human Resource Management">Human Resource Management</option>
               <option value="Planning and Budget Service">Planning and Budget Service</option>
-              <option value="Product Quality Control Service">Product Quality Control Service</option>
-              <option value="Production and Technic">Production and Technic</option>
+              <option value="Production Quality Control Service">Production Quality Control Service</option>
+              <option value="Production">Production</option>
+              <option value="Technic">Technic</option>
               <option value="Property Management">Property Management</option>
+              <option value="Finance">Finance</option>
             </select>
           </div>
           <div style="display:flex; gap:10px;">
@@ -108,15 +109,17 @@
               <label for="rf-department">Department</label>
               <select id="rf-department" required>
                 <option value="">Select department…</option>
-                <option value="Medical">Medical</option>
-                <option value="Finance">Finance</option>
+                <option value="Manager">Manager</option>
                 <option value="Human Resource Management">Human Resource Management</option>
                 <option value="Planning and Budget Service">Planning and Budget Service</option>
-                <option value="Product Quality Control Service">Product Quality Control Service</option>
-                <option value="Production and Technic">Production and Technic</option>
+                <option value="Production Quality Control Service">Production Quality Control Service</option>
+                <option value="Production">Production</option>
+                <option value="Technic">Technic</option>
                 <option value="Property Management">Property Management</option>
+                <option value="Finance">Finance</option>
               </select>
             </div>
+
             <div class="field span-2">
               <label for="rf-position">Position</label>
               <select id="rf-position" required>
@@ -259,7 +262,9 @@
 
   <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
+  
   <script src="js/auth.js"></script>
+  <script src="js/permissions.js"></script>
   <script src="js/roles.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/shell.js"></script>
@@ -269,3 +274,5 @@
   <script src="js/registrations.js"></script>
 </body>
 </html>
+
+

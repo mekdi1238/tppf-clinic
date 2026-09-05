@@ -48,12 +48,48 @@
             <div class="toolbar-filters">
               <div class="search-box">
                 <span id="stock-search-icon-slot"></span>
-                <input type="text" id="stock-search-input" placeholder="Search drugs…" />
+                <input type="text" id="stock-search-input" placeholder="Search by name, ID (D001), category, batch…" />
               </div>
+              <select class="select-filter" id="stock-category-filter">
+                <option value="all">All categories</option>
+                <option value="Anti Acid drugs">1. Anti Acid drugs</option>
+                <option value="Eye ointment">2. Eye ointment</option>
+                <option value="Skin ointment">3. Skin ointment</option>
+                <option value="Iv Fluid">4. Iv Fluid</option>
+                <option value="Syringe">5. Syringe</option>
+                <option value="Anti Pain">6. Anti Pain</option>
+                <option value="Dressing materials">7. Dressing materials</option>
+                <option value="Disinfectant solution">8. Disinfectant solution</option>
+                <option value="Adhesive Plaster">9. Adhesive Plaster</option>
+                <option value="Anti bacterial Drug">10. Anti bacterial Drug</option>
+                <option value="Cardiovascular Drug (CVS)">11. Cardiovascular Drug (CVS)</option>
+                <option value="Anti diabetic">12. Anti diabetic</option>
+                <option value="minerals">13. minerals</option>
+                <option value="Anti protocol">14. Anti protocol</option>
+                <option value="Anti Inflammatory Drugs">15. Anti Inflammatory Drugs</option>
+                <option value="Other">Other Category</option>
+              </select>
+              <select class="select-filter" id="stock-condition-filter">
+                <option value="all">All stock &amp; expiry states</option>
+                <option value="good">Good Condition</option>
+                <option value="expiring_soon">Expiring Soon (&lt; 6 mo)</option>
+                <option value="expired">Expired</option>
+                <option value="low_stock">Low Stock (≤ Min)</option>
+                <option value="out_of_stock">Out of Stock (= 0)</option>
+                <option value="overstock">Overstocked (&gt; Max)</option>
+              </select>
             </div>
-            <button class="btn btn-primary" id="new-drug-btn">
-              <span id="drug-plus-icon-slot"></span> Add Drug
-            </button>
+            <div style="display:flex; gap:10px;">
+              <button type="button" class="btn btn-secondary" id="import-drugs-btn">
+                <span id="import-icon-slot"></span> Import
+              </button>
+              <button type="button" class="btn btn-secondary" id="export-drugs-btn">
+                <span id="export-icon-slot"></span> Export
+              </button>
+              <button class="btn btn-primary" id="new-drug-btn">
+                <span id="drug-plus-icon-slot"></span> Add Drug
+              </button>
+            </div>
           </div>
           <div id="stock-table-region"></div>
         </div>
@@ -115,43 +151,117 @@
       </div>
       <div class="modal-body" id="rx-detail-body"></div>
       <div class="modal-footer">
+        <button class="btn btn-danger btn-sm" id="rx-detail-delete-btn" style="margin-right:auto; display:inline-flex; align-items:center; gap:4px;">Delete Prescription</button>
+        <button type="button" class="btn btn-primary btn-sm" id="rx-detail-print-btn" style="display:inline-flex; align-items:center; gap:6px;">Print Prescription</button>
         <button class="btn btn-secondary" id="rx-detail-close-btn">Close</button>
       </div>
     </div>
   </div>
 
-  <!-- Add Drug Modal -->
+
+
+  <!-- Add / Edit Drug Modal -->
   <div class="modal-backdrop" id="drug-modal-backdrop">
-    <div class="modal">
+    <div class="modal modal-wide" style="max-width:750px;">
       <div class="modal-header">
         <div>
-          <h2>Add Drug</h2>
-          <p>Add a new drug to the clinic formulary.</p>
+          <h2 id="drug-modal-title">Add Drug</h2>
+          <p id="drug-modal-subtitle">Add or update a pharmaceutical stock item in the clinic formulary.</p>
         </div>
         <button class="icon-btn" id="drug-modal-close"></button>
       </div>
       <form id="drug-form">
+        <input type="hidden" id="df-id" />
         <div class="modal-body">
           <div class="form-grid">
+            <div class="field">
+              <label for="df-code">ID / Item Code</label>
+              <input type="text" id="df-code" placeholder="e.g. D001 (leave blank for auto)" />
+              <div class="hint">Unique identifier. Auto-generated as D... if omitted.</div>
+            </div>
+            <div class="field">
+              <label for="df-name">Item Name <span style="color:var(--color-danger);">*</span></label>
+              <input type="text" id="df-name" required placeholder="e.g. Omeprazole 20mg" />
+            </div>
+
+            <div class="field">
+              <label for="df-category">Category</label>
+              <select id="df-category">
+                <option value="">Select category…</option>
+                <option value="Anti Acid drugs">1. Anti Acid drugs</option>
+                <option value="Eye ointment">2. Eye ointment</option>
+                <option value="Skin ointment">3. Skin ointment</option>
+                <option value="Iv Fluid">4. Iv Fluid</option>
+                <option value="Syringe">5. Syringe</option>
+                <option value="Anti Pain">6. Anti Pain</option>
+                <option value="Dressing materials">7. Dressing materials</option>
+                <option value="Disinfectant solution">8. Disinfectant solution</option>
+                <option value="Adhesive Plaster">9. Adhesive Plaster</option>
+                <option value="Anti bacterial Drug">10. Anti bacterial Drug</option>
+                <option value="Cardiovascular Drug (CVS)">11. Cardiovascular Drug (CVS)</option>
+                <option value="Anti diabetic">12. Anti diabetic</option>
+                <option value="minerals">13. minerals</option>
+                <option value="Anti protocol">14. Anti protocol</option>
+                <option value="Anti Inflammatory Drugs">15. Anti Inflammatory Drugs</option>
+                <option value="other">+ Type custom category…</option>
+              </select>
+            </div>
+
+            <div class="field" id="df-custom-category-wrap" style="display:none;">
+              <label for="df-custom-category">Custom Category Name <span style="color:var(--color-danger);">*</span></label>
+              <input type="text" id="df-custom-category" placeholder="Type custom category name…" />
+              <div class="hint">Enter your specific clinical category.</div>
+            </div>
+
+            <div class="field">
+              <label for="df-unit">Unit / Measurement</label>
+              <select id="df-unit">
+                <option value="">Select unit…</option>
+                <option value="bottle">bottle</option>
+                <option value="strips">strips</option>
+                <option value="capsul">capsul</option>
+                <option value="packet">packet</option>
+                <option value="sachet">sachet</option>
+                <option value="other">+ Type custom unit…</option>
+              </select>
+
+            </div>
+
+            <div class="field" id="df-custom-unit-wrap" style="display:none;">
+              <label for="df-custom-unit">Custom Unit <span style="color:var(--color-danger);">*</span></label>
+              <input type="text" id="df-custom-unit" placeholder="e.g. ampoule, vial, box…" />
+              <div class="hint">Type your custom unit of measurement.</div>
+            </div>
+
+            <div class="field">
+              <label for="df-batch">Batch No (Lot #)</label>
+              <input type="text" id="df-batch" placeholder="e.g. B10429" />
+            </div>
+
+            <div class="field">
+              <label for="df-threshold">Min / Threshold (Reorder)</label>
+              <input type="number" id="df-threshold" min="0" value="0" placeholder="e.g. 20" />
+            </div>
+
+            <div class="field">
+              <label for="df-max">Maximum Limit</label>
+              <input type="number" id="df-max" min="0" placeholder="e.g. 500 (optional)" />
+            </div>
+
+            <div class="field">
+              <label for="df-quantity">Quantity on Hand</label>
+              <input type="number" id="df-quantity" min="0" value="0" placeholder="Current stock" />
+            </div>
+
+            <div class="field">
+              <label for="df-expiry">Expiration Date (YYYY-MM-DD)</label>
+              <input type="date" id="df-expiry" />
+              <div class="hint">Format: Year-Month-Day (YYYY-MM-DD)</div>
+            </div>
+
             <div class="field span-2">
-              <label for="df-name">Name</label>
-              <input type="text" id="df-name" required />
-            </div>
-            <div class="field">
-              <label for="df-unit">Unit</label>
-              <input type="text" id="df-unit" placeholder="tablet, capsule, sachet…" />
-            </div>
-            <div class="field">
-              <label for="df-quantity">Initial quantity</label>
-              <input type="number" id="df-quantity" min="0" value="0" />
-            </div>
-            <div class="field">
-              <label for="df-threshold">Reorder threshold</label>
-              <input type="number" id="df-threshold" min="0" value="0" />
-            </div>
-            <div class="field span-2">
-              <label for="df-description">Description</label>
-              <input type="text" id="df-description" placeholder="Optional" />
+              <label for="df-description">Description / Clinical Notes</label>
+              <input type="text" id="df-description" placeholder="Optional clinical indications, storage condition, etc." />
             </div>
           </div>
         </div>
@@ -177,7 +287,13 @@
         <div class="modal-body">
           <div class="field">
             <label for="rs-delta">Quantity change</label>
-            <input type="number" id="rs-delta" required />
+            <input type="number" id="rs-delta" required placeholder="e.g. +50 or -5" />
+            <div class="hint">Enter positive to add stock, negative to reduce.</div>
+          </div>
+          <div class="field" style="margin-top:12px;">
+            <label for="rs-expiry">Update expiry date</label>
+            <input type="date" id="rs-expiry" />
+            <div class="hint">Optional. Leave unchanged or pick new date.</div>
           </div>
         </div>
         <div class="modal-footer">
@@ -190,10 +306,17 @@
 
   <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
+  
   <script src="js/auth.js"></script>
+  <script src="js/permissions.js"></script>
   <script src="js/roles.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/shell.js"></script>
+  <script src="js/importModal.js"></script>
+  <script src="js/exportModal.js"></script>
+  <script src="js/printDocument.js"></script>
   <script src="js/pharmacy.js"></script>
 </body>
 </html>
+
+
