@@ -220,6 +220,17 @@ async function ensureDatabaseExists(maxRetries = 15, delayMs = 2000) {
   }
 }
 
+async function runAutoMigrations() {
+  if (!process.env.DATABASE_URL) return;
+  const client = await ensureDatabaseExists();
+  try {
+    await ensureMigrationsTable(client);
+    await cmdUp(client);
+  } finally {
+    await client.end();
+  }
+}
+
 async function main() {
   const command = process.argv[2];
   if (!["up", "down", "status"].includes(command)) {
@@ -245,7 +256,13 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  runAutoMigrations,
+};
