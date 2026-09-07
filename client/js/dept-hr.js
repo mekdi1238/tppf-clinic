@@ -530,7 +530,7 @@ document.getElementById('dispatch-form').addEventListener('submit', async (e) =>
   try {
     const payload = {
       patient_id: selectedPatientForDispatch.id,
-      chief_complaint: document.getElementById('df-reason').value.trim() || 'Department Checkup Dispatch',
+      chief_complaint: document.getElementById('df-reason').value.trim() || 'Periodic Medical Check-up / Health Assessment',
     };
 
     await Api.visits.create(payload);

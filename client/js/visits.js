@@ -218,10 +218,21 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
             <strong style="font-size:12px;">${UI.escapeHtml(v.physician ? v.physician.full_name : 'Unassigned')}</strong>
           `}
         </div>
-      </div>
-      <div class="detail-item" style="margin-top:10px;">
-        <div class="k">Chief complaint</div>
-        <div class="v" style="font-weight:500;">${UI.escapeHtml(v.chief_complaint)}</div>
+      <div class="field" style="margin-top:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <label for="vd-complaint" style="font-weight:700; font-size:12.5px; color:var(--color-text);">Chief Complaint / Reason for Encounter</label>
+          ${canEditClinical ? `<span class="text-muted" style="font-size:11px;">Editable by physician</span>` : ''}
+        </div>
+        ${canEditClinical ? `
+          <div style="display:flex; gap:8px; align-items:flex-start;">
+            <textarea id="vd-complaint" rows="2" style="width:100%; font-size:13.5px; line-height:1.4; padding:8px 10px; border-radius:6px; border:1px solid var(--color-border);" placeholder="Patient chief complaint or reason for encounter…">${UI.escapeHtml(v.chief_complaint || '')}</textarea>
+            <button type="button" class="btn btn-secondary btn-sm" id="vd-save-complaint-btn" title="Save Chief Complaint" style="padding:6px 10px; font-size:12px; white-space:nowrap; margin-top:2px; display:inline-flex; align-items:center; gap:4px;">
+              ${Icons.render('check')} Save
+            </button>
+          </div>
+        ` : `
+          <div class="v" style="font-weight:500; font-size:13.5px; background:var(--color-bg-secondary); padding:8px 12px; border-radius:6px; border:1px solid var(--color-border-subtle); color:var(--color-text);">${UI.escapeHtml(v.chief_complaint || '—')}</div>
+        `}
       </div>
     </div>
 
@@ -481,6 +492,30 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
     });
   }
 
+  const saveComplaintBtn = document.getElementById('vd-save-complaint-btn');
+  if (saveComplaintBtn) {
+    saveComplaintBtn.addEventListener('click', async () => {
+      const complaintVal = (document.getElementById('vd-complaint').value || '').trim();
+      if (!complaintVal) {
+        UI.toast('Chief complaint cannot be empty.', 'danger');
+        return;
+      }
+      saveComplaintBtn.disabled = true;
+      saveComplaintBtn.innerHTML = '<span class="spinner"></span>';
+      try {
+        await Api.visits.update(v.id, { chief_complaint: complaintVal });
+        v.chief_complaint = complaintVal;
+        UI.toast('Chief complaint updated successfully.');
+        isClinicalNotesDirty = false;
+        loadVisits();
+      } catch (err) {
+        UI.toast(UI.errorMessage(err), 'danger');
+      } finally {
+        saveComplaintBtn.disabled = false;
+        saveComplaintBtn.innerHTML = `${Icons.render('check')} Save`;
+      }
+    });
+  }
 
   if (canRecordVitals) {
     const toggleBtn = document.getElementById('vd-vitals-toggle');
@@ -529,6 +564,8 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
 
   if (canEditClinical) {
     const markDirty = () => { isClinicalNotesDirty = true; };
+    const complaintInput = document.getElementById('vd-complaint');
+    if (complaintInput) complaintInput.addEventListener('input', markDirty);
     document.getElementById('vd-notes').addEventListener('input', markDirty);
     document.getElementById('vd-diagnosis').addEventListener('input', markDirty);
     document.getElementById('vd-treatment').addEventListener('input', markDirty);
@@ -540,13 +577,19 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> Saving…';
       try {
-        await Api.visits.update(v.id, {
+        const payload = {
           examination_notes: document.getElementById('vd-notes').value,
           diagnosis: document.getElementById('vd-diagnosis').value,
           treatment: document.getElementById('vd-treatment').value,
           hr_note: document.getElementById('vd-hr-note').value,
           disposition: document.getElementById('vd-disposition').value || null,
-        });
+        };
+        const complaintEl = document.getElementById('vd-complaint');
+        if (complaintEl) {
+          payload.chief_complaint = complaintEl.value.trim();
+          v.chief_complaint = payload.chief_complaint;
+        }
+        await Api.visits.update(v.id, payload);
         UI.toast('Notes saved.');
         isClinicalNotesDirty = false;
         loadVisits();
@@ -600,6 +643,10 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
         treatment: document.getElementById('vd-treatment').value,
         examination_notes: document.getElementById('vd-notes').value
       };
+      const complaintEl = document.getElementById('vd-complaint');
+      if (complaintEl) {
+        payload.chief_complaint = complaintEl.value.trim();
+      }
       if (document.getElementById('vd-diagnosis')) {
         const diag = document.getElementById('vd-diagnosis').value.trim();
         if (diag) payload.diagnosis = diag;
@@ -628,6 +675,10 @@ function renderVisitDetail(v, admission, labOrders, prescriptions, referrals, si
         hr_note: document.getElementById('vd-hr-note').value,
         treatment: document.getElementById('vd-treatment').value
       };
+      const complaintEl = document.getElementById('vd-complaint');
+      if (complaintEl) {
+        payload.chief_complaint = complaintEl.value.trim();
+      }
       if (next === 'diagnosed') {
         const diagnosisVal = document.getElementById('vd-diagnosis').value.trim();
         if (!diagnosisVal) {
