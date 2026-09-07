@@ -60,7 +60,7 @@ const ROLE_DEFAULTS = {
   physician: [
     "nav.dashboard", "nav.patients", "nav.visits", "nav.admissions", "nav.checkups",
     "nav.registrations", "nav.certifications", "nav.laboratory", "nav.pharmacy",
-    "nav.referrals", "nav.profile",
+    "nav.referrals", "nav.reports", "reports.export", "nav.profile",
     "patients.create", "patients.edit", "patients.view_history",
     "visits.create", "visits.edit", "visits.delete", "vitals.create",
     "admissions.create", "admissions.edit", "admissions.discharge",
@@ -73,7 +73,7 @@ const ROLE_DEFAULTS = {
 
   receptionist: [
     "nav.dashboard", "nav.patients", "nav.visits", "nav.checkups",
-    "nav.registrations", "nav.profile",
+    "nav.registrations", "nav.reports", "reports.export", "nav.profile",
     "patients.create", "patients.edit",
     "visits.create", "visits.delete",
     "checkups.dispatch",
@@ -111,12 +111,12 @@ const ROLE_DEFAULTS = {
   ],
 
   lab_technician: [
-    "nav.dashboard", "nav.patients", "nav.laboratory", "nav.profile",
+    "nav.dashboard", "nav.patients", "nav.laboratory", "nav.reports", "reports.export", "nav.profile",
     "lab.record_result", "profile.edit",
   ],
 
   pharmacist: [
-    "nav.dashboard", "nav.patients", "nav.pharmacy", "nav.profile",
+    "nav.dashboard", "nav.patients", "nav.pharmacy", "nav.reports", "reports.export", "nav.profile",
     "pharmacy.dispense", "pharmacy.manage_stock", "profile.edit",
   ],
 };

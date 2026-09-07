@@ -32,7 +32,24 @@ async function startServer() {
     // 1. Wait for database to be ready
     await waitForDatabase();
 
-    // 2. Initialize Express application
+    // 2. Automatically apply pending database migrations and verify role permissions
+    try {
+      const { runAutoMigrations } = require("../../db/migrate");
+      await runAutoMigrations();
+      await pool.query(`
+        UPDATE roles
+        SET default_permissions = (
+          SELECT jsonb_agg(DISTINCT elem)
+          FROM jsonb_array_elements_text(default_permissions || '["nav.reports", "reports.export"]'::jsonb) AS elem
+        )
+        WHERE default_permissions IS NOT NULL;
+      `);
+      logger.info("Database migrations applied and universal role default permissions verified.");
+    } catch (migErr) {
+      logger.warn(`[MIGRATION RUNNER] Auto-migration check: ${migErr.message}`);
+    }
+
+    // 3. Initialize Express application
     const app = createApp();
 
     const server = app.listen(config.port, () => {

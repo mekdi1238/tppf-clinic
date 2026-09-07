@@ -72,6 +72,15 @@ function requireRole(...allowedRolesOrPerms) {
         }
       }
 
+      // Universal Reports access: Every authenticated user can view & export reports by default,
+      // unless explicitly restricted by an admin (overrides.get(...) === false).
+      if (overrides.get("nav.reports") !== false) {
+        effective.add("nav.reports");
+      }
+      if (overrides.get("reports.export") !== false) {
+        effective.add("reports.export");
+      }
+
       // Apply explicit user overrides
       for (const [perm, granted] of overrides.entries()) {
         if (granted === true) effective.add(perm);
@@ -90,6 +99,15 @@ function requireRole(...allowedRolesOrPerms) {
         }
         // Granted permission check
         if (effective.has(routePerm)) {
+          return next();
+        }
+      }
+
+      // Allow users with nav.reports to read reporting datasets for analytics and charts
+      if (req.method === "GET" && effective.has("nav.reports") && overrides.get("nav.reports") !== false) {
+        const isReportingPath = /^\/(patients|visits|registrations|certifications|admissions|lab-orders|drugs|lab-test-catalog|departments)/.test(req.path) ||
+                                /^\/api\/v1\/(patients|visits|registrations|certifications|admissions|lab-orders|drugs|lab-test-catalog|departments)/.test(fullPath);
+        if (isReportingPath && (!routePerm || overrides.get(routePerm) !== false)) {
           return next();
         }
       }
