@@ -5,11 +5,19 @@ const { query, pool } = require("../db/pool");
 const config = require("../config/env");
 const logger = require("../utils/logger");
 
-const BACKUPS_DIR = path.resolve(__dirname, "../../backups");
+function getBackupsDir() {
+  const custom = (config && config.backupDir) || process.env.BACKUP_DIR;
+  if (custom && typeof custom === "string" && custom.trim()) {
+    const clean = custom.replace(/^["']|["']$/g, "").trim();
+    if (clean) return path.resolve(clean);
+  }
+  return path.resolve(__dirname, "../../backups");
+}
 
 function ensureBackupDir() {
-  if (!fs.existsSync(BACKUPS_DIR)) {
-    fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+  const dir = getBackupsDir();
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
 }
 
@@ -197,7 +205,7 @@ async function createBackup(label = "Manual Backup", userId = null) {
   const now = new Date();
   const dateStr = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const filename = `tppf_clinic_backup_${dateStr}.sql`;
-  const filePath = path.join(BACKUPS_DIR, filename);
+  const filePath = path.join(getBackupsDir(), filename);
 
   const dbInfo = parseDbUrl();
 
@@ -251,7 +259,7 @@ async function getBackupFile(id) {
   if (!backup) return null;
 
   ensureBackupDir();
-  const filePath = path.join(BACKUPS_DIR, backup.filename);
+  const filePath = path.join(getBackupsDir(), backup.filename);
   return {
     backup,
     filePath,
@@ -334,10 +342,11 @@ function sanitizeAndReorderBackupSql(rawSql) {
 async function syncBackupsFromDisk(clientOrPool = null) {
   ensureBackupDir();
   const db = clientOrPool || pool;
+  const dir = getBackupsDir();
 
-  const files = fs.readdirSync(BACKUPS_DIR).filter(f => f.endsWith(".sql"));
+  const files = fs.readdirSync(dir).filter(f => f.endsWith(".sql"));
   for (const file of files) {
-    const fullPath = path.join(BACKUPS_DIR, file);
+    const fullPath = path.join(dir, file);
     if (!fs.existsSync(fullPath)) continue;
 
     const stat = fs.statSync(fullPath);
@@ -471,7 +480,7 @@ async function importBackup({ filename, sql, filePath, label, restoreImmediately
   const targetFilename = rawBase.startsWith("tppf_clinic_backup_")
     ? rawBase
     : `tppf_clinic_backup_${datePrefix}_${rawBase}`;
-  const targetPath = path.join(BACKUPS_DIR, targetFilename);
+  const targetPath = path.join(getBackupsDir(), targetFilename);
 
   // Write file to backups directory if not already there
   fs.writeFileSync(targetPath, sqlContent, "utf8");

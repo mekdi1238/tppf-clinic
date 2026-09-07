@@ -25,6 +25,7 @@ const config = {
   databaseUrl: process.env.DATABASE_URL,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "12h",
+  backupDir: process.env.BACKUP_DIR ? process.env.BACKUP_DIR.replace(/^["']|["']$/g, "").trim() : null,
 };
 
 module.exports = config;
