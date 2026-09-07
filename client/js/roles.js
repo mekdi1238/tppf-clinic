@@ -15,6 +15,14 @@ const RoleGuard = (() => {
     'HR Reporting': 'hr_reporting',
     'Department HR': 'department_hr',
     'System Administrator': 'system_administrator',
+    'receptionist': 'receptionist',
+    'physician': 'physician',
+    'lab_technician': 'lab_technician',
+    'pharmacist': 'pharmacist',
+    'hr_admin': 'hr_admin',
+    'hr_reporting': 'hr_reporting',
+    'department_hr': 'department_hr',
+    'system_administrator': 'system_administrator',
   };
 
   const ELEVATED = ['system_administrator'];
@@ -22,7 +30,7 @@ const RoleGuard = (() => {
   function current() {
     const session = Auth.getSession();
     if (!session) return [];
-    return session.user.roles.map(r => ROLE_KEYS[r]).filter(Boolean);
+    return (session.user.roles || []).map(r => ROLE_KEYS[r] || r).filter(Boolean);
   }
 
   function has(key) {

@@ -572,7 +572,7 @@ function renderReportsData() {
 
 async function init() {
   try {
-    const [patients, visits, registrations, certifications, admissions, labOrders, drugs] = await Promise.all([
+    const [patientsRes, visitsRes, regsRes, certsRes, admsRes, labsRes, drugsRes] = await Promise.allSettled([
       Api.patients.list(),
       Api.visits.list(),
       Api.registrations.list({ status: 'all' }),
@@ -582,19 +582,32 @@ async function init() {
       Api.drugs.list(),
     ]);
 
+    const patients = patientsRes.status === 'fulfilled' ? (patientsRes.value || []) : [];
+    const visits = visitsRes.status === 'fulfilled' ? (visitsRes.value || []) : [];
+    const registrations = regsRes.status === 'fulfilled' ? (regsRes.value || []) : [];
+    const certifications = certsRes.status === 'fulfilled' ? (certsRes.value || []) : [];
+    const admissions = admsRes.status === 'fulfilled' ? (admsRes.value || []) : [];
+    const labOrders = labsRes.status === 'fulfilled' ? (labsRes.value || []) : [];
+    const drugs = drugsRes.status === 'fulfilled' ? (drugsRes.value || []) : [];
+
     globalDataCache = { patients, visits, registrations, certifications, admissions, labOrders, drugs };
 
     const exportBtn = document.getElementById('open-export-modal-btn');
     if (exportBtn) {
-      exportBtn.addEventListener('click', () => {
-        const periodSelect = document.getElementById('report-period-select');
-        const startDate = document.getElementById('report-start-date');
-        const endDate = document.getElementById('report-end-date');
-        const currentPeriod = periodSelect ? periodSelect.value : 'all';
-        const currentStart = startDate ? startDate.value : null;
-        const currentEnd = endDate ? endDate.value : null;
-        ExportModal.open('patients', currentPeriod, currentStart, currentEnd);
-      });
+      if (typeof Permissions !== 'undefined' && !Permissions.has('reports.export')) {
+        exportBtn.style.display = 'none';
+      } else {
+        exportBtn.style.display = 'inline-flex';
+        exportBtn.addEventListener('click', () => {
+          const periodSelect = document.getElementById('report-period-select');
+          const startDate = document.getElementById('report-start-date');
+          const endDate = document.getElementById('report-end-date');
+          const currentPeriod = periodSelect ? periodSelect.value : 'all';
+          const currentStart = startDate ? startDate.value : null;
+          const currentEnd = endDate ? endDate.value : null;
+          ExportModal.open('patients', currentPeriod, currentStart, currentEnd);
+        });
+      }
     }
 
     const periodSelect = document.getElementById('report-period-select');

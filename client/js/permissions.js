@@ -332,6 +332,14 @@ const Permissions = (() => {
     'HR Reporting': 'hr_reporting',
     'Department HR': 'department_hr',
     'System Administrator': 'system_administrator',
+    'receptionist': 'receptionist',
+    'physician': 'physician',
+    'lab_technician': 'lab_technician',
+    'pharmacist': 'pharmacist',
+    'hr_admin': 'hr_admin',
+    'hr_reporting': 'hr_reporting',
+    'department_hr': 'department_hr',
+    'system_administrator': 'system_administrator',
   };
 
   const NAV_KEY_TO_PERM = {
@@ -370,6 +378,7 @@ const Permissions = (() => {
       'nav.laboratory', 'lab.create_order',
       'nav.pharmacy',
       'nav.referrals', 'referrals.create', 'referrals.edit', 'sick_leaves.create',
+      'nav.reports', 'reports.export',
       'nav.profile', 'profile.edit',
     ],
 
@@ -378,6 +387,7 @@ const Permissions = (() => {
       'nav.visits', 'visits.create', 'visits.delete',
       'nav.checkups', 'checkups.dispatch',
       'nav.registrations', 'registrations.create', 'registrations.edit',
+      'nav.reports', 'reports.export',
       'nav.profile', 'profile.edit',
     ],
 
@@ -412,12 +422,14 @@ const Permissions = (() => {
     lab_technician: [
       'nav.dashboard', 'nav.patients',
       'nav.laboratory', 'lab.record_result',
+      'nav.reports', 'reports.export',
       'nav.profile', 'profile.edit',
     ],
 
     pharmacist: [
       'nav.dashboard', 'nav.patients',
       'nav.pharmacy', 'pharmacy.dispense', 'pharmacy.manage_stock',
+      'nav.reports', 'reports.export',
       'nav.profile', 'profile.edit',
     ],
   };
@@ -451,6 +463,12 @@ const Permissions = (() => {
       const perms = roleMap[r] || BASELINE_ROLE_DEFAULTS[r] || BASELINE_ROLE_DEFAULTS[ROLE_KEYS[r]] || [];
       for (const p of perms) defaults.add(p);
     }
+
+    // Universal default: All authenticated roles include nav.reports and reports.export by default
+    if (roleIdentifiers && roleIdentifiers.length > 0) {
+      defaults.add('nav.reports');
+      defaults.add('reports.export');
+    }
     return defaults;
   }
 
@@ -476,6 +494,14 @@ const Permissions = (() => {
     // Start with union of all role defaults
     const effective = defaultsForRoles(userRoles);
 
+    // Universal default: Every user can view & export reports unless explicitly revoked
+    if (customPerms['nav.reports'] !== false) {
+      effective.add('nav.reports');
+    }
+    if (customPerms['reports.export'] !== false) {
+      effective.add('reports.export');
+    }
+
     // Apply explicit user overrides
     for (const [key, granted] of Object.entries(customPerms)) {
       if (granted === true) {
@@ -497,7 +523,7 @@ const Permissions = (() => {
     const session = _getSession();
     if (!session) return null;
 
-    const userRoles = (session.user.roles || []).map(r => ROLE_KEYS[r]).filter(Boolean);
+    const userRoles = (session.user.roles || []).map(r => ROLE_KEYS[r] || r).filter(Boolean);
     if (userRoles.includes('system_administrator')) return null;
 
     const allowed = [];
@@ -717,6 +743,13 @@ const Permissions = (() => {
   function handleMatrixCheckboxChange(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
+
+    // If nav.reports is unchecked, also uncheck reports.export
+    const navReportsCb = container.querySelector('input.matrix-perm-cb[data-key="nav.reports"]');
+    const reportsExportCb = container.querySelector('input.matrix-perm-cb[data-key="reports.export"]');
+    if (navReportsCb && !navReportsCb.checked && reportsExportCb && reportsExportCb.checked) {
+      reportsExportCb.checked = false;
+    }
 
     const cbs = container.querySelectorAll('input.matrix-perm-cb');
     cbs.forEach(cb => {

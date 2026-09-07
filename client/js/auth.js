@@ -53,7 +53,43 @@ const Auth = {
     if (session) {
       session.user = { ...session.user, ...userData };
       this.setSession(session);
+      if (typeof Permissions !== 'undefined') {
+        Permissions.invalidateCache();
+      }
     }
+  },
+  async syncProfile() {
+    try {
+      const session = this.getSession();
+      if (!session || !session.token) return false;
+      const res = await fetch('/api/v1/profile', {
+        headers: { 'Authorization': `Bearer ${session.token}` }
+      });
+      if (res.ok) {
+        const profile = await res.json();
+        if (profile) {
+          const current = this.getSession();
+          if (!current) return false;
+
+          const oldPerms = JSON.stringify(current.user.custom_permissions || {});
+          const newPerms = JSON.stringify(profile.custom_permissions || {});
+          const oldRoles = JSON.stringify(current.user.roles || []);
+          const newRoles = JSON.stringify((profile.roles || []).map(r => r.display_name || r.name));
+          const changed = oldPerms !== newPerms || oldRoles !== newRoles;
+
+          current.user.roles = (profile.roles || []).map(r => r.display_name || r.name);
+          current.user.custom_permissions = profile.custom_permissions || {};
+          current.user.photo_url = profile.photo_url || null;
+          current.user.full_name = profile.full_name || current.user.full_name;
+          this.setSession(current);
+          if (typeof Permissions !== 'undefined') {
+            Permissions.invalidateCache();
+          }
+          return changed;
+        }
+      }
+    } catch (_) {}
+    return false;
   },
   clearSession() {
     sessionStorage.removeItem(SESSION_KEY);

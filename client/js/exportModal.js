@@ -388,6 +388,12 @@ const ExportModal = (() => {
   }
 
   function open(defaultDataset = 'patients', defaultPeriod = null, defaultStartDate = null, defaultEndDate = null) {
+    if (typeof Permissions !== 'undefined' && !Permissions.has('reports.export')) {
+      if (typeof UI !== 'undefined') {
+        UI.toast('You do not have permission to export reports.', 'danger');
+      }
+      return;
+    }
     ensureModalMarkup();
     const selectEl = document.getElementById('export-dataset-select');
     selectEl.value = defaultDataset in DATASET_CONFIGS ? defaultDataset : 'patients';

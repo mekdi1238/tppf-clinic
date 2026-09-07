@@ -452,6 +452,21 @@ document.getElementById('user-edit-form').addEventListener('submit', async (e) =
 
   try {
     await Api.users.update(editingUserId, payload);
+
+    // If the currently logged in user edited their own permissions, update local session immediately
+    const session = Auth.getSession();
+    if (session && String(editingUserId) === String(session.user.id)) {
+      session.user.custom_permissions = customPermissions;
+      if (fullName) session.user.full_name = fullName;
+      const assignedRoleObjects = rolesCache.filter(r => roleIds.includes(r.id));
+      session.user.roles = assignedRoleObjects.map(r => r.display_name || r.name);
+      Auth.setSession(session);
+      Permissions.invalidateCache();
+      if (typeof window.renderShellNavOnly === 'function') {
+        window.renderShellNavOnly();
+      }
+    }
+
     UI.toast('User updated successfully.');
     closeUserEdit();
     await loadUsers();

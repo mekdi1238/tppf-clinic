@@ -64,7 +64,38 @@ function renderNavItem(item, activeKey) {
   return `<a class="${classes.join(' ')}" href="${item.href}" title="${titleAttr}">${Icons.render(item.icon)}<span>${item.label}</span>${badge}</a>`;
 }
 
+let currentActiveNavKey = null;
+
+function renderShellNavOnly() {
+  const allowedKeys = RoleGuard.allowedNavKeys();
+  const visibleSections = NAV_SECTIONS
+    .map(section => ({
+      ...section,
+      items: allowedKeys ? section.items.filter(item => allowedKeys.includes(item.key)) : section.items,
+    }))
+    .filter(section => section.items.length > 0);
+
+  const navContainer = document.querySelector('.sidebar-nav');
+  if (navContainer) {
+    navContainer.innerHTML = visibleSections.map(section => `
+      <div class="nav-section-label">${section.label}</div>
+      ${section.items.map(item => renderNavItem(item, currentActiveNavKey)).join('')}
+    `).join('');
+  }
+}
+
 function renderShell(activeKey) {
+  currentActiveNavKey = activeKey;
+
+  // Background permission sync: immediately updates session if admin tweaked permissions
+  if (typeof Auth !== 'undefined' && typeof Auth.syncProfile === 'function') {
+    Auth.syncProfile().then(changed => {
+      if (changed) {
+        renderShellNavOnly();
+      }
+    }).catch(() => {});
+  }
+
   const session = Auth.getSession();
   const allowedKeys = RoleGuard.allowedNavKeys();
   const visibleSections = NAV_SECTIONS
@@ -202,3 +233,17 @@ function setPageTitle(title) {
   if (el) el.textContent = title;
   document.title = `${title} · TPPF Clinic`;
 }
+
+// Global exposure
+window.renderShellNavOnly = renderShellNavOnly;
+
+// Sync permissions when tab regains focus or when navigating back
+window.addEventListener('focus', () => {
+  if (typeof Auth !== 'undefined' && typeof Auth.syncProfile === 'function') {
+    Auth.syncProfile().then(changed => {
+      if (changed) {
+        renderShellNavOnly();
+      }
+    }).catch(() => {});
+  }
+});
